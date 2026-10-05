@@ -1,6 +1,4 @@
 // Börde-Cup – Verbindung zu Firebase
-// Ersetze die Werte unten durch die Angaben aus der Firebase-Konsole
-// (Projekteinstellungen > Allgemein > Meine Apps > SDK-Einrichtung > Konfiguration).
 window.BC_CONFIG = {
   firebase: {
     apiKey: "AIzaSyBEvlITEbgPEz97bYdJ3QeVxdneVnHAhTQ",
