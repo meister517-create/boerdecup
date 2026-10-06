@@ -1,4 +1,4 @@
-# 40. Soester Börde-Cup – Web-App
+# 40. Soester Börde-Cup – Web-App 
 
 Frontend (Spielplan, Teams, Tabelle, Essen & Getränke, Thekengold) und Orga-Bereich.
 Gehostet über GitHub Pages, Daten und Login über Firebase (kostenlos).
