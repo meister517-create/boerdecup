@@ -1,4 +1,4 @@
-# 40. Soester Börde-Cup – Web-App 
+# 40. Soester Börde-Cup – Web-App
 
 Frontend (Spielplan, Teams, Tabelle, Essen & Getränke, Thekengold) und Orga-Bereich.
 Gehostet über GitHub Pages, Daten und Login über Firebase (kostenlos).
@@ -61,3 +61,18 @@ Dateien: `index.html`, `app.js`, `config.js`, `logo.png`, `firestore.rules`, `RE
 - **Passwort ändern:** in Firebase unter Authentication → Nutzer. Der Code muss dafür nicht angepasst werden.
 - **Kosten:** Der kostenlose Firebase-Tarif erlaubt 50.000 Lesezugriffe pro Tag. Jede Änderung zählt einmal pro gerade geöffnetem Handy. Bei z. B. 150 offenen Handys und 300 Änderungen an einem Tag wird es knapp. Wer sicher gehen will, stellt auf den Tarif *Blaze* um und setzt eine Budget-Warnung von z. B. 5 €. Die tatsächlichen Kosten liegen dann im Cent-Bereich.
 - **Sicherheit:** Das Passwort steht nirgends im Code. Ohne Firebase-Login kann niemand Daten ändern.
+
+---
+
+## Update Oktober 2026: Turniermodus B2
+
+Dateien: `index.html`, `app.js` und neu `engine.js` (enthält Spielplan und Turnierlogik).
+`config.js`, `logo.png` und `firestore.rules` bleiben unverändert.
+
+1. Im Repository „Add file → Upload files“, die drei Dateien hochladen, „Commit changes“.
+2. Seite mit `#orga` öffnen, anmelden.
+   - Neue Datenbank: „Startdaten anlegen“.
+   - Bereits eingerichtete Datenbank mit altem Spielplan: „Auf neuen Turniermodus umstellen“.
+3. Unter „Teams“ die Namen gemäß Auslosung eintragen (Herren A–G, Damen 1–6), veröffentlichen.
+4. Ergebnisse am Turniertag unter „Ergebnisse“ eintragen und pro Spiel „Speichern“ tippen – sofort live.
+5. Infotexte (Turnierkonzept, Party …) unter „Infos“ pflegen; sie erscheinen hinter dem „i“ auf der Startseite.

@@ -236,6 +236,50 @@ label.f{display:block;font-size:.85rem;font-weight:600;margin:12px 0 5px}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
+
+/* --- Modus B2, Infos --- */
+.hero-top{position:relative}
+.info-btn{margin-left:auto;width:40px;height:40px;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:rgba(255,255,255,.14);color:#fff;font:italic 800 1.25rem/1 Georgia,serif;cursor:pointer;display:grid;place-items:center;flex:none}
+.info-btn:active{transform:scale(.94)}
+.ihead{position:sticky;top:0;z-index:5;background:var(--red);color:#fff;padding-top:env(safe-area-inset-top,0px)}
+.ihead .wrap{display:flex;align-items:center;gap:8px;padding-top:10px;padding-bottom:10px}
+.ihead h1{flex:1;margin:0;font-size:1.25rem;font-weight:900;font-stretch:100%;text-align:center}
+.iconbtn{width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;cursor:pointer;flex:none}
+.iconbtn svg{width:22px;height:22px}
+.ipage{padding-bottom:40px}
+.isec{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin-top:14px}
+.isec h2{margin:0 0 8px;font-size:1.2rem;font-weight:850}
+.isec p{margin:0 0 10px;line-height:1.55}
+.isec p:last-child{margin-bottom:0}
+.ilead{display:block;font-weight:800;margin-bottom:2px}
+.isec a{color:var(--red);font-weight:650;word-break:break-all}
+.game .refl{grid-column:1/-1;text-align:center;font-size:.74rem;color:var(--muted);margin-top:6px;border-top:1px dashed var(--line);padding-top:6px}
+.game.next .refl,.game.live .refl{color:rgba(255,255,255,.6);border-color:rgba(255,255,255,.2)}
+.koh{font-weight:900;font-size:1.05rem;margin:16px 0 0;color:var(--red)}
+.dayhint{margin:0 0 6px!important}
+.endgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.endst{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.endst h3{margin:0 0 6px;font-size:1rem}
+.endst ol{list-style:none;margin:0;padding:0}
+.endst li{padding:4px 0;border-top:1px solid var(--line);font-size:.92rem}
+.endst li:first-child{border-top:0;font-weight:800}
+.endst li.ph-t{color:var(--muted);font-style:italic}
+.badge{display:inline-block;font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--line)}
+.badge.ok{background:#E6F4EA;border-color:#9BD3AE;color:#1E6B3A}
+.rres.done{border-color:#9BD3AE}
+.rtop{display:flex;gap:10px;align-items:baseline;font-size:.88rem;color:var(--muted);margin-bottom:8px;flex-wrap:wrap}
+.rtop b{color:var(--ink)}
+.rgrid{display:grid;grid-template-columns:1fr 54px 10px 54px 1fr;gap:8px;align-items:center}
+.rgrid .rt{font-weight:650;line-height:1.2;overflow-wrap:anywhere}
+.rgrid .rt.r{text-align:right}
+.rgrid.pen{margin-top:8px}.rgrid.pen .rt{font-size:.8rem;color:var(--muted);font-weight:500}
+.rgrid .colon{text-align:center;font-weight:800}
+.in.sc{text-align:center;font-weight:800;font-size:1.1rem;padding:9px 4px}
+.warn{color:var(--red);font-weight:700;font-size:.85rem}
+.okt{color:#1E6B3A;font-weight:700;font-size:.85rem}
+.seed{flex:none;font-weight:800;font-size:.85rem;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.in.ta{margin-top:8px;resize:vertical;min-height:120px;line-height:1.45;font-size:.95rem}
+@media (max-width:420px){.endgrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
