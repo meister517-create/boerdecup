@@ -1,8 +1,8 @@
 
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,doc,onSnapshot,setDoc,updateDoc,arrayUnion,arrayRemove,deleteField} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,doc,onSnapshot,setDoc,updateDoc,arrayUnion,arrayRemove,deleteField} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {compute,startTs,defaultTeams,DEFAULT_SETTINGS,H_SEEDS,D_SEEDS} from "./engine.js";
+import {compute,startTs,defaultTeams,DEFAULT_SETTINGS,H_SEEDS,D_SEEDS} from "./engine.js?v=20261011";
 
 var CFG=window.BC_CONFIG||{};
 var LOGO="logo.png";
@@ -53,7 +53,7 @@ function seedLabel(t){return "Team "+t.seed}
 var ICON={
  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>',
  plan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 17h7"/></svg>',
- teams:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>',
+ teams:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M6.5 20v-1.5a5.5 5.5 0 0 1 11 0V20"/><circle cx="5" cy="9.5" r="2.2"/><path d="M1.5 20v-1a3.5 3.5 0 0 1 4.6-3.3"/><circle cx="19" cy="9.5" r="2.2"/><path d="M22.5 20v-1a3.5 3.5 0 0 0-4.6-3.3"/></svg>',
  table:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V10h5v11M9 21V4h6v17M15 21v-8h5v8M2 21h20"/></svg>',
  food:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v8a3 3 0 0 0 6 0V2M9 2v20M17 2c-2 2-3 5-3 8h4v12"/></svg>',
  gold:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h10v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10h2.5a2.5 2.5 0 0 1 0 5H15M5 8a3 3 0 0 1 2.5-4 3 3 0 0 1 5 0A3 3 0 0 1 15 8M8.5 12v5M11.5 12v5"/></svg>',
@@ -172,7 +172,7 @@ function richText(t){
     return '<p>'+lead+h+'</p>'}).join("")}
 function vInfo(){
   var secs=S().info.filter(function(s){return (s.title||"").trim()||(s.text||"").trim()});
-  return '<div class="ihead"><div class="wrap"><button class="iconbtn" data-go="home" aria-label="Zurück zur Startseite">'+ICON.back+'</button><h1>Infos zum Turnier</h1><button class="iconbtn" data-go="home" aria-label="Schließen">'+ICON.close+'</button></div></div>'+
+  return '<div class="ihead"><div class="wrap"><span class="iconspacer" aria-hidden="true"></span><h1>Infos zum Turnier</h1><button class="iconbtn" data-go="home" aria-label="Schließen">'+ICON.close+'</button></div></div>'+
     '<main class="ipage"><div class="wrap">'+(secs.length?secs.map(function(s){return '<section class="isec"><h2>'+esc(s.title)+'</h2>'+richText(s.text)+'</section>'}).join(""):'<div class="empty">Hier erscheinen bald alle Infos zum Turnier.</div>')+
     '<p style="margin-top:28px;text-align:center"><button class="btn ghost" data-go="home">Zurück zur Startseite</button></p></div></main>';
 }
@@ -224,10 +224,13 @@ function aInfo(D){
     '</div><button class="btn ghost" data-act="infoAdd">Abschnitt hinzufügen</button>';
 }
 function aFood(D){
-  return '<p class="hint">Kategorien, Angebote und Preise. Ausverkauftes bleibt sichtbar, aber durchgestrichen.</p>'+D.menu.map(function(c){
-    return '<div class="card"><div class="row"><input class="in grow" style="font-weight:800" data-k="cat.name" data-id="'+c.id+'" value="'+esc(c.name)+'" aria-label="Kategorie"><button class="btn icon" data-act="delCat" data-id="'+c.id+'" aria-label="Kategorie löschen">✕</button></div><div class="rows" style="margin-top:10px">'+
-    c.items.map(function(i){return '<div style="border-top:1px solid var(--line);padding-top:8px"><div class="row"><input class="in grow" data-k="it.name" data-cid="'+c.id+'" data-id="'+i.id+'" value="'+esc(i.name)+'" aria-label="Name"><input class="in" style="width:86px;text-align:right" inputmode="decimal" data-k="it.price" data-cid="'+c.id+'" data-id="'+i.id+'" value="'+String(i.price).replace(".",",")+'" aria-label="Preis in Euro"><span>€</span></div>'+
-     '<div class="row" style="margin-top:6px"><input class="in grow" data-k="it.note" data-cid="'+c.id+'" data-id="'+i.id+'" value="'+esc(i.note)+'" placeholder="Hinweis (optional)" aria-label="Hinweis"><label class="row" style="font-size:.85rem;gap:4px"><input type="checkbox" data-k="it.out" data-cid="'+c.id+'" data-id="'+i.id+'"'+(i.out?' checked':'')+'>aus</label><button class="btn icon" data-act="delItem" data-cid="'+c.id+'" data-id="'+i.id+'" aria-label="Angebot löschen">✕</button></div></div>'}).join("")+
+  return '<p class="hint">Kategorien, Angebote und Preise. Mit den Pfeilen änderst du die Reihenfolge. Ausverkauftes bleibt sichtbar, aber durchgestrichen.</p>'+D.menu.map(function(c,ci){
+    return '<div class="card"><div class="row"><input class="in grow" style="font-weight:800" data-k="cat.name" data-id="'+c.id+'" value="'+esc(c.name)+'" aria-label="Kategorie">'+
+    '<button class="btn icon" data-act="catUp" data-id="'+c.id+'" aria-label="Kategorie nach oben"'+(ci?'':' disabled')+'>↑</button><button class="btn icon" data-act="catDown" data-id="'+c.id+'" aria-label="Kategorie nach unten"'+(ci<D.menu.length-1?'':' disabled')+'>↓</button>'+
+    '<button class="btn icon" data-act="delCat" data-id="'+c.id+'" aria-label="Kategorie löschen">✕</button></div><div class="rows" style="margin-top:10px">'+
+    c.items.map(function(i,ii){return '<div style="border-top:1px solid var(--line);padding-top:8px"><div class="row"><input class="in grow" data-k="it.name" data-cid="'+c.id+'" data-id="'+i.id+'" value="'+esc(i.name)+'" aria-label="Name">'+
+     '<button class="btn icon" data-act="itUp" data-cid="'+c.id+'" data-id="'+i.id+'" aria-label="Angebot nach oben"'+(ii?'':' disabled')+'>↑</button><button class="btn icon" data-act="itDown" data-cid="'+c.id+'" data-id="'+i.id+'" aria-label="Angebot nach unten"'+(ii<c.items.length-1?'':' disabled')+'>↓</button>'+
+     '</div><div class="row" style="margin-top:6px"><input class="in" style="width:86px;text-align:right" inputmode="decimal" data-k="it.price" data-cid="'+c.id+'" data-id="'+i.id+'" value="'+String(i.price).replace(".",",")+'" aria-label="Preis in Euro"><span>€</span><input class="in grow" data-k="it.note" data-cid="'+c.id+'" data-id="'+i.id+'" value="'+esc(i.note)+'" placeholder="Hinweis" aria-label="Hinweis"><label class="row" style="font-size:.85rem;gap:4px"><input type="checkbox" data-k="it.out" data-cid="'+c.id+'" data-id="'+i.id+'"'+(i.out?' checked':'')+'>aus</label><button class="btn icon" data-act="delItem" data-cid="'+c.id+'" data-id="'+i.id+'" aria-label="Angebot löschen">✕</button></div></div>'}).join("")+
     '</div><button class="btn ghost sm" data-act="addItem" data-id="'+c.id+'" style="margin-top:10px">Angebot hinzufügen</button></div>'}).join("")+
    '<button class="btn ghost" data-act="addCat">Kategorie hinzufügen</button>';
 }
@@ -411,6 +414,8 @@ app.addEventListener("click",function(e){
   else if(a==="infoDel"){if(!confirm("Abschnitt „"+(I[ix].title||"")+"“ löschen?"))return;I.splice(ix,1)}
   else if(a==="infoUp"&&ix>0){I.splice(ix-1,0,I.splice(ix,1)[0])}
   else if(a==="infoDown"&&ix>=0&&ix<I.length-1){I.splice(ix+1,0,I.splice(ix,1)[0])}
+  else if(a==="catUp"||a==="catDown"){var M=DRAFT.menu,ci=M.findIndex(function(c){return c.id===id}),cj=ci+(a==="catUp"?-1:1);if(ci<0||cj<0||cj>=M.length)return;M.splice(cj,0,M.splice(ci,1)[0])}
+  else if(a==="itUp"||a==="itDown"){var it=findC(t.dataset.cid).items,ii=it.findIndex(function(x){return x.id===id}),ij=ii+(a==="itUp"?-1:1);if(ii<0||ij<0||ij>=it.length)return;it.splice(ij,0,it.splice(ii,1)[0])}
   else if(a==="addCat"){DRAFT.menu.push({id:uid("c"),name:"Neue Kategorie",items:[]})}
   else if(a==="delCat"){if(!confirm("Kategorie mit allen Angeboten löschen?"))return;DRAFT.menu=DRAFT.menu.filter(function(c){return c.id!==id})}
   else if(a==="addItem"){findC(id).items.push({id:uid("i"),name:"Neues Angebot",price:0,note:"",out:false})}
@@ -431,18 +436,22 @@ app.addEventListener("keydown",function(e){
 
 /* ---------- welcome ---------- */
 function welcome(done){
-  var last=lsGet("bc-welcomed");if(last&&Date.now()-last<6*3600e3){done();return}
-  lsSet("bc-welcomed",Date.now());
+  // Intro bei jedem Öffnen der Seite (nicht im Orga-Bereich und nicht auf der Infoseite)
   var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
   var w=document.createElement("div");w.id="welcome";w.setAttribute("role","dialog");w.setAttribute("aria-label","Willkommen zum 40. Soester Börde-Cup");
   w.innerHTML='<canvas></canvas><div class="w-inner"><img class="w-logo" src="'+LOGO+'" alt="Logo Soester Hockey-Club"><p class="w-num">40.</p><p class="w-title">Soester Börde-Cup</p><p class="w-sub">Schön, dass ihr da seid</p></div>';
   document.body.appendChild(w);done();
   var fin=false;function close(){if(fin)return;fin=true;w.classList.add("out");setTimeout(function(){w.remove()},650)}
   w.addEventListener("click",close);
-  if(reduce){setTimeout(close,1800);return}
   var cv=w.querySelector("canvas"),ctx=cv.getContext("2d"),dpr=Math.min(2,window.devicePixelRatio||1);
-  cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;
+  var vw=Math.max(innerWidth||0,document.documentElement.clientWidth||0,320),vh=Math.max(innerHeight||0,document.documentElement.clientHeight||0,480);
+  cv.width=vw*dpr;cv.height=vh*dpr;
   var cols=["#FFFFFF","#000000","#F4D27A","#1C4E9E","#FFFFFF"],P=[];
+  if(reduce){
+    // "Bewegung reduzieren" ist am Gerät aktiv: Konfetti ohne Bewegung, damit es trotzdem festlich aussieht
+    for(var i=0;i<140;i++){ctx.save();ctx.translate(Math.random()*cv.width,Math.random()*cv.height);ctx.rotate(Math.random()*6.3);ctx.fillStyle=cols[i%cols.length];
+      if(Math.random()<.25){ctx.beginPath();ctx.arc(0,0,(3+Math.random()*3)*dpr,0,6.3);ctx.fill()}else ctx.fillRect(-5*dpr,-2.5*dpr,(7+Math.random()*6)*dpr,(3+Math.random()*4)*dpr);ctx.restore()}
+    setTimeout(close,2600);return}
   function burst(x,y,n,dir){for(var i=0;i<n;i++){var a=dir+(Math.random()-.5)*1.1,s=(9+Math.random()*13)*dpr;
     P.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,w:(6+Math.random()*7)*dpr,h:(3+Math.random()*5)*dpr,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:cols[i%cols.length],round:Math.random()<.25})}}
   var t0=performance.now();
@@ -499,13 +508,14 @@ app.addEventListener("focusout",function(){if(pendingRender){setTimeout(function
 function startFirebase(){
   var c=CFG.firebase||{};
   if(!c.apiKey||/DEIN|YOUR/.test(c.apiKey)){fbError="Firebase ist noch nicht eingerichtet. Bitte die Datei config.js ausfüllen (siehe Anleitung).";authReady=true;render(true);return}
-  var fb=initializeApp(c),db=getFirestore(fb);auth=getAuth(fb);
+  var fb=initializeApp(c),db=initializeFirestore(fb,{experimentalAutoDetectLongPolling:true});auth=getAuth(fb);
+  restFallback(c);
   refs={main:doc(db,"boerdecup","main"),gold:doc(db,"boerdecup","gold"),logos:doc(db,"boerdecup","logos"),results:doc(db,"boerdecup","results")};
   var goldLog=[],goldUpdated="";
   onAuthStateChanged(auth,function(u){USER=u;authReady=true;if(!u)DRAFT=null;render(true)});
   onSnapshot(refs.main,function(snap){
     if(!snap.exists()&&snap.metadata&&snap.metadata.fromCache)return;
-    var wasDirty=isDirty();mainLoaded=true;
+    var wasDirty=isDirty();mainLoaded=true;if(!(snap.metadata&&snap.metadata.fromCache)){liveOK=true;if(restTimer)clearInterval(restTimer)}
     if(!snap.exists()){STATE=null;DRAFT=null;safeRender();return}
     STATE=norm(snap.data());STATE.goldLog=goldLog;STATE.goldUpdated=goldUpdated;
     if(DRAFT){if(wasDirty){DRAFT.goldLog=goldLog}else DRAFT=null}
@@ -518,6 +528,38 @@ function startFirebase(){
     safeRender();
   },function(err){console.error(err)});
   onSnapshot(refs.logos,function(snap){LOGOS=snap.exists()?snap.data():{};safeRender()},function(err){console.error(err)});
+}
+/* ---------- Notlauf: Daten per REST laden, falls die Live-Verbindung auf einem Gerät nicht zustande kommt ---------- */
+var liveOK=false,restTimer=null;
+function fsVal(v){
+  if(!v||typeof v!=="object")return null;
+  if("stringValue" in v)return v.stringValue;
+  if("integerValue" in v)return Number(v.integerValue);
+  if("doubleValue" in v)return Number(v.doubleValue);
+  if("booleanValue" in v)return v.booleanValue;
+  if("nullValue" in v)return null;
+  if("timestampValue" in v)return v.timestampValue;
+  if("mapValue" in v){var o={},f=v.mapValue.fields||{};Object.keys(f).forEach(function(k){o[k]=fsVal(f[k])});return o}
+  if("arrayValue" in v)return (v.arrayValue.values||[]).map(fsVal);
+  return null}
+async function restGet(c,name){
+  var r=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(c.projectId)+"/databases/(default)/documents/boerdecup/"+name+"?key="+encodeURIComponent(c.apiKey),{cache:"no-store"});
+  if(r.status===404)return null;if(!r.ok)throw new Error("HTTP "+r.status);
+  var j=await r.json(),o={},f=j.fields||{};Object.keys(f).forEach(function(k){o[k]=fsVal(f[k])});return o}
+function restFallback(c){
+  async function load(){
+    if(liveOK){clearInterval(restTimer);return}
+    try{
+      var m=await restGet(c,"main"),rs=await restGet(c,"results"),g=await restGet(c,"gold"),l=await restGet(c,"logos");
+      if(liveOK)return;
+      mainLoaded=true;slowLoad=false;
+      var gl=((g&&g.log)||[]).slice().sort(function(a,b){return a.ts-b.ts});
+      STATE=m?norm(m):null;if(STATE){STATE.goldLog=gl;STATE.goldUpdated=(g&&g.updated)||""}
+      RESULTS={games:(rs&&rs.games)||{},los:(rs&&rs.los)||{}};LOGOS=l||{};
+      safeRender();
+    }catch(e){console.error("REST",e)}
+  }
+  setTimeout(function(){if(!liveOK){load();restTimer=setInterval(load,15000)}},5000);
 }
 /* ---------- start ---------- */
 setInterval(function(){if((route==="plan"||route==="home")&&!document.querySelector("#welcome"))render(true)},20000);
