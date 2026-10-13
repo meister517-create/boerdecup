@@ -13,10 +13,11 @@ export const TEMPLATE = [
   G(1, "D", 1, 3), G(1, "HA", "A1", "A2"), G(1, "HB", "B1", "B2"), G(1, "D", 6, 2),
   G(1, "HA", "A3", "A4"), G(1, "HB", "B3", "B4"), G(1, "D", 1, 5), G(1, "D", 3, 4),
   G(2, "D", 1, 2), G(2, "D", 4, 5), G(2, "D", 3, 6),
-  K("HHF1", "Halbfinale 1 Herren"), K("HPS1", "Überkreuz 1 um Platz 5–8"), K("HPS2", "Überkreuz 2 um Platz 5–8"),
-  K("DHF1", "Halbfinale 1 Damen"), K("HHF2", "Halbfinale 2 Herren"), K("DHF2", "Halbfinale 2 Damen"),
-  K("HP5", "Spiel um Platz 5 Herren"), K("HP7", "Spiel um Platz 7 Herren"), K("DP5", "Spiel um Platz 5 Damen"),
-  K("DP3", "Spiel um Platz 3 Damen"), K("DF", "Finale Damen"), K("HP3", "Spiel um Platz 3 Herren"), K("HF", "Finale Herren")
+  K("HPS1", "Überkreuz 1 um Platz 5–8"), K("HPS2", "Überkreuz 2 um Platz 5–8"),
+  K("DHF1", "Halbfinale 1 Damen"), K("DHF2", "Halbfinale 2 Damen"), K("HP7", "Spiel um Platz 7 Herren"),
+  K("HHF1", "Halbfinale 1 Herren"), K("HHF2", "Halbfinale 2 Herren"),
+  K("DP5", "Spiel um Platz 5 Damen"), K("HP5", "Spiel um Platz 5 Herren"),
+  K("DP3", "Spiel um Platz 3 Damen"), K("HP3", "Spiel um Platz 3 Herren"), K("DF", "Finale Damen"), K("HF", "Finale Herren")
 ];
 
 export const MODE = "M8";
@@ -115,12 +116,12 @@ export function compute(settings, teams, results) {
     return {w: [null, "Sieger Spiel " + g.nr], l: [null, "Verlierer Spiel " + g.nr]};
   };
   const ko = (c, x, y) => { const g = Gc(c); set(g, 1, x[0], x[1]); set(g, 2, y[0], y[1]); };
-  ko("HHF1", br(1), ar(2)); ko("HHF2", ar(1), br(2));
-  ko("HPS1", br(3), ar(4)); ko("HPS2", ar(3), br(4));
+  ko("HPS1", ar(3), br(4)); ko("HPS2", br(3), ar(4));
   ko("DHF1", dr(2), dr(3)); ko("DHF2", dr(1), dr(4)); ko("DP5", dr(5), dr(6));
-  ko("HP5", out("HPS2").w, out("HPS1").w); ko("HP7", out("HPS2").l, out("HPS1").l);
-  ko("DP3", out("DHF2").l, out("DHF1").l); ko("DF", out("DHF2").w, out("DHF1").w);
-  ko("HP3", out("HHF2").l, out("HHF1").l); ko("HF", out("HHF2").w, out("HHF1").w);
+  ko("HHF1", ar(1), br(2)); ko("HHF2", br(1), ar(2));
+  ko("HP7", out("HPS1").l, out("HPS2").l); ko("HP5", out("HPS1").w, out("HPS2").w);
+  ko("DP3", out("DHF1").l, out("DHF2").l); ko("DF", out("DHF1").w, out("DHF2").w);
+  ko("HP3", out("HHF1").l, out("HHF2").l); ko("HF", out("HHF1").w, out("HHF2").w);
 
   // Schiedsrichter: erstes Spiel des Tages = Einstellung, sonst die Teams des Vorspiels
   games.forEach((g, i) => {
