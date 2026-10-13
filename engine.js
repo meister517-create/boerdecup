@@ -1,20 +1,35 @@
-/* Börde-Cup 2026 – Turnier-Engine (Modus B2, fester Turnierbaum)
-   Reine Rechenlogik ohne Oberfläche: Spielplan, Uhrzeiten, Paarungen, Tabellen, K.-o.-Runde, Endstand. */
+/* Börde-Cup 2026 – Turnier-Engine (Modus M8: Herren 2 Gruppen à 4, Damen 6er-Gruppe, alle Plätze ausgespielt)
+   Reine Rechenlogik ohne Oberfläche: Spielplan, Uhrzeiten, Paarungen, Tabellen, Platzierungsspiele, Endstand. */
 
-// Fester Spielplan: d = Tag (1 Sa, 2 So), c = Code, a/b = Auslosung (HV: Buchstabe, D: Nummer, HH: Platz in der Vorrunde)
-export const TEMPLATE = [{"d":1,"c":"D","a":1,"b":2,"l":"Damen"},{"d":1,"c":"HV","a":"A","b":"B","l":"Herren Vorrunde"},{"d":1,"c":"D","a":3,"b":6,"l":"Damen"},{"d":1,"c":"HV","a":"C","b":"D","l":"Herren Vorrunde"},{"d":1,"c":"D","a":4,"b":5,"l":"Damen"},{"d":1,"c":"HV","a":"E","b":"F","l":"Herren Vorrunde"},{"d":1,"c":"HV","a":"G","b":"A","l":"Herren Vorrunde"},{"d":1,"c":"D","a":6,"b":2,"l":"Damen"},{"d":1,"c":"D","a":5,"b":3,"l":"Damen"},{"d":1,"c":"D","a":1,"b":4,"l":"Damen"},{"d":1,"c":"HV","a":"B","b":"C","l":"Herren Vorrunde"},{"d":1,"c":"HV","a":"D","b":"E","l":"Herren Vorrunde"},{"d":1,"c":"HV","a":"F","b":"G","l":"Herren Vorrunde"},{"d":1,"c":"D","a":2,"b":3,"l":"Damen"},{"d":1,"c":"D","a":1,"b":5,"l":"Damen"},{"d":1,"c":"D","a":6,"b":4,"l":"Damen"},{"d":1,"c":"HH","a":1,"b":4,"l":"Herren Hauptrunde"},{"d":1,"c":"HH","a":2,"b":5,"l":"Herren Hauptrunde"},{"d":1,"c":"HH","a":3,"b":6,"l":"Herren Hauptrunde"},{"d":1,"c":"D","a":1,"b":3,"l":"Damen"},{"d":1,"c":"D","a":5,"b":6,"l":"Damen"},{"d":1,"c":"D","a":4,"b":2,"l":"Damen"},{"d":1,"c":"HH","a":7,"b":1,"l":"Herren Hauptrunde"},{"d":2,"c":"HH","a":4,"b":2,"l":"Herren Hauptrunde"},{"d":2,"c":"HH","a":5,"b":3,"l":"Herren Hauptrunde"},{"d":2,"c":"HH","a":6,"b":7,"l":"Herren Hauptrunde"},{"d":2,"c":"D","a":1,"b":6,"l":"Damen"},{"d":2,"c":"D","a":2,"b":5,"l":"Damen"},{"d":2,"c":"D","a":3,"b":4,"l":"Damen"},{"d":2,"c":"VF1","a":null,"b":null,"l":"Viertelfinale 1 Herren"},{"d":2,"c":"VF2","a":null,"b":null,"l":"Viertelfinale 2 Herren"},{"d":2,"c":"VF3","a":null,"b":null,"l":"Viertelfinale 3 Herren"},{"d":2,"c":"DHF1","a":null,"b":null,"l":"Halbfinale 1 Damen"},{"d":2,"c":"DHF2","a":null,"b":null,"l":"Halbfinale 2 Damen"},{"d":2,"c":"HHF1","a":null,"b":null,"l":"Halbfinale 1 Herren"},{"d":2,"c":"HHF2","a":null,"b":null,"l":"Halbfinale 2 Herren"},{"d":2,"c":"DP3","a":null,"b":null,"l":"Spiel um Platz 3 Damen"},{"d":2,"c":"DF","a":null,"b":null,"l":"Finale Damen"},{"d":2,"c":"HP3","a":null,"b":null,"l":"Spiel um Platz 3 Herren"},{"d":2,"c":"HF","a":null,"b":null,"l":"Finale Herren"}];
+// Fester Spielplan (Reihenfolge wie Spielplan_Modell2_final.xlsx)
+// d = Tag (1 Sa, 2 So), c = Code, a/b = Auslosung (Herren "A1".."B4", Damen 1..6), l = Bezeichnung
+const G = (d, c, a, b) => ({d, c, a, b, l: c === "HA" ? "Gruppe A" : c === "HB" ? "Gruppe B" : "Damen"});
+const K = (c, l) => ({d: 2, c, a: null, b: null, l});
+export const TEMPLATE = [
+  G(1, "HA", "A1", "A3"), G(1, "HB", "B1", "B3"), G(1, "D", 1, 4), G(1, "D", 2, 5),
+  G(1, "HA", "A2", "A3"), G(1, "HB", "B2", "B4"), G(1, "D", 1, 6), G(1, "D", 5, 3),
+  G(1, "HA", "A2", "A4"), G(1, "HB", "B1", "B4"), G(1, "D", 6, 4), G(1, "D", 2, 3),
+  G(1, "HA", "A1", "A4"), G(1, "HB", "B2", "B3"), G(1, "D", 5, 6), G(1, "D", 4, 2),
+  G(1, "D", 1, 3), G(1, "HA", "A1", "A2"), G(1, "HB", "B1", "B2"), G(1, "D", 6, 2),
+  G(1, "HA", "A3", "A4"), G(1, "HB", "B3", "B4"), G(1, "D", 1, 5), G(1, "D", 3, 4),
+  G(2, "D", 1, 2), G(2, "D", 4, 5), G(2, "D", 3, 6),
+  K("HHF1", "Halbfinale 1 Herren"), K("HPS1", "Überkreuz 1 um Platz 5–8"), K("HPS2", "Überkreuz 2 um Platz 5–8"),
+  K("DHF1", "Halbfinale 1 Damen"), K("HHF2", "Halbfinale 2 Herren"), K("DHF2", "Halbfinale 2 Damen"),
+  K("HP5", "Spiel um Platz 5 Herren"), K("HP7", "Spiel um Platz 7 Herren"), K("DP5", "Spiel um Platz 5 Damen"),
+  K("DP3", "Spiel um Platz 3 Damen"), K("DF", "Finale Damen"), K("HP3", "Spiel um Platz 3 Herren"), K("HF", "Finale Herren")
+];
 
-export const H_SEEDS = ["A", "B", "C", "D", "E", "F", "G"];
+export const MODE = "M8";
+export const H_SEEDS = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"];
 export const D_SEEDS = [1, 2, 3, 4, 5, 6];
-export const KO_CODES = ["VF1", "VF2", "VF3", "DHF1", "DHF2", "HHF1", "HHF2", "DP3", "DF", "HP3", "HF"];
-const SHORT = {VF1: "VF 1", VF2: "VF 2", VF3: "VF 3", DHF1: "HF 1 Damen", DHF2: "HF 2 Damen", HHF1: "HF 1 Herren",
-  HHF2: "HF 2 Herren", DP3: "Spiel um Platz 3 Damen", DF: "Finale Damen", HP3: "Spiel um Platz 3 Herren", HF: "Finale Herren"};
+export const KO_CODES = TEMPLATE.filter(t => t.a === null).map(t => t.c);
+export const GAME_COUNT = TEMPLATE.length;
 
 export const DEFAULT_SETTINGS = {day1: "2026-10-24", day2: "2026-10-25", start1: "09:00", start2: "09:00",
-  durG: 20, chgG: 5, durK: 17, chgK: 3, refFirst: "Soest", date: "24. und 25. Oktober 2026", place: ""};
+  durG: 20, chgG: 5, durK: 17, chgK: 5, refFirst: "Soest", date: "24. und 25. Oktober 2026", place: ""};
 
 export function defaultTeams() {
-  return H_SEEDS.map(s => ({id: "h" + s, cat: "H", seed: s, name: "Herren-Team " + s}))
+  return H_SEEDS.map(s => ({id: "h" + s, cat: "H", seed: s, name: "Herren " + s}))
     .concat(D_SEEDS.map(s => ({id: "d" + s, cat: "D", seed: s, name: "Damen-Team " + s})));
 }
 
@@ -55,19 +70,16 @@ export function compute(settings, teams, results) {
   const D = D_SEEDS.map(s => teams.find(t => t.cat === "D" && t.seed === s));
   const TG = (+S.durG || 0) + (+S.chgG || 0), TK = (+S.durK || 0) + (+S.chgK || 0);
 
-  // Grunddaten je Spiel (Uhrzeit, Spielzeit, Ergebnis)
-  let satI = 0, sunI = 0;
+  // Grunddaten je Spiel: Uhrzeit läuft je Tag fortlaufend, Gruppenspiele mit Gruppen-, Platzierungsspiele mit K.-o.-Takt
+  const clock = {1: hm(S.start1), 2: hm(S.start2)};
   const games = TEMPLATE.map((tp, i) => {
-    const nr = i + 1, ko = KO_CODES.includes(tp.c);
-    let start;
-    if (tp.d === 1) start = hm(S.start1) + (satI++) * TG;
-    else if (!ko) start = hm(S.start2) + (sunI++) * TG;
-    else start = hm(S.start2) + 6 * TG + KO_CODES.indexOf(tp.c) * TK;
+    const nr = i + 1, ko = KO_CODES.includes(tp.c), start = clock[tp.d];
+    clock[tp.d] += ko ? TK : TG;
     const r = R["g" + nr] || {};
     const h = num(r.h), a = num(r.a), p1 = num(r.p1), p2 = num(r.p2);
     const played = h !== null && a !== null;
     const decided = played && (h !== a || (ko && p1 !== null && p2 !== null && p1 !== p2));
-    return {nr, code: tp.c, phase: ko ? "KO" : tp.c, cat: (tp.c === "D" || tp.c[0] === "D") ? "D" : "H",
+    return {nr, code: tp.c, phase: ko ? "KO" : tp.c, cat: tp.c[0] === "D" ? "D" : "H",
       label: tp.l, day: tp.d, date: tp.d === 1 ? S.day1 : S.day2, start, time: fmt(start),
       dur: ko ? +S.durK : +S.durG, ko, h, a, p1, p2, played, decided: ko ? decided : played,
       partial: (h === null) !== (a === null), t1: null, t2: null, l1: "", l2: ""};
@@ -75,46 +87,40 @@ export function compute(settings, teams, results) {
   const set = (g, s, id, label) => { g["t" + s] = id || null; g["l" + s] = id ? byId[id].name : label; };
   const res = gs => gs.filter(g => g.played && g.t1 && g.t2).map(g => ({t1: g.t1, t2: g.t2, h: g.h, a: g.a}));
 
-  // Vorrunde Herren + Damen-Gruppe
+  // Gruppenspiele
   games.forEach(g => {
     const tp = TEMPLATE[g.nr - 1];
-    if (g.code === "HV") { const x = H[H_SEEDS.indexOf(tp.a)], y = H[H_SEEDS.indexOf(tp.b)]; set(g, 1, x && x.id, "Team " + tp.a); set(g, 2, y && y.id, "Team " + tp.b); }
-    if (g.code === "D") { const x = D[tp.a - 1], y = D[tp.b - 1]; set(g, 1, x && x.id, "Team " + tp.a); set(g, 2, y && y.id, "Team " + tp.b); }
+    if (g.code === "HA" || g.code === "HB") {
+      const x = H[H_SEEDS.indexOf(tp.a)], y = H[H_SEEDS.indexOf(tp.b)];
+      set(g, 1, x && x.id, "Herren " + tp.a); set(g, 2, y && y.id, "Herren " + tp.b);
+    }
+    if (g.code === "D") { const x = D[tp.a - 1], y = D[tp.b - 1]; set(g, 1, x && x.id, "Damen " + tp.a); set(g, 2, y && y.id, "Damen " + tp.b); }
   });
-  const hv = games.filter(g => g.code === "HV"), dg = games.filter(g => g.code === "D");
-  const Hs = H.filter(Boolean), Ds = D.filter(Boolean);
-  const tabV = standings(Hs, res(hv), LOS.V);
-  const completeV = hv.every(g => g.played);
-  // Hauptrunde: festes Schema nach Platz in der Vorrunde
-  games.forEach(g => {
-    if (g.code !== "HH") return;
-    const tp = TEMPLATE[g.nr - 1];
-    [[1, tp.a], [2, tp.b]].forEach(([s, r]) => set(g, s, completeV ? tabV[r - 1].t.id : null, r + ". Vorrunde"));
-  });
-  const hh = games.filter(g => g.code === "HH");
-  const tabG = standings(Hs, res(hv.concat(hh)), LOS.G);
-  const completeG = completeV && hh.every(g => g.played);
-  const tabD = standings(Ds, res(dg), LOS.D);
-  const completeD = dg.every(g => g.played);
+  const ga = games.filter(g => g.code === "HA"), gb = games.filter(g => g.code === "HB"), dg = games.filter(g => g.code === "D");
+  const HA = H.slice(0, 4).filter(Boolean), HB = H.slice(4).filter(Boolean), Ds = D.filter(Boolean);
+  const tabA = standings(HA, res(ga), LOS.A), tabB = standings(HB, res(gb), LOS.B), tabD = standings(Ds, res(dg), LOS.D);
+  const completeA = ga.every(g => g.played), completeB = gb.every(g => g.played), completeD = dg.every(g => g.played);
 
-  // K.-o.-Runde
-  const G = c => games.find(g => g.code === c);
-  const hr = r => completeG ? [tabG[r - 1].t.id, r + ". Herren"] : [null, r + ". Herren"];
-  const dr = r => completeD ? [tabD[r - 1].t.id, r + ". Damen"] : [null, r + ". Damen"];
+  // Platzierungsspiele
+  const Gc = c => games.find(g => g.code === c);
+  const ar = r => completeA && tabA[r - 1] ? [tabA[r - 1].t.id, r + ". Gruppe A"] : [null, r + ". Gruppe A"];
+  const br = r => completeB && tabB[r - 1] ? [tabB[r - 1].t.id, r + ". Gruppe B"] : [null, r + ". Gruppe B"];
+  const dr = r => completeD && tabD[r - 1] ? [tabD[r - 1].t.id, r + ". Damen"] : [null, r + ". Damen"];
   const out = c => {
-    const g = G(c);
+    const g = Gc(c);
     if (g.decided && g.t1 && g.t2) {
       const w1 = g.h > g.a || (g.h === g.a && g.p1 > g.p2);
       return {w: [w1 ? g.t1 : g.t2, ""], l: [w1 ? g.t2 : g.t1, ""]};
     }
-    return {w: [null, "Sieger " + SHORT[c]], l: [null, "Verlierer " + SHORT[c]]};
+    return {w: [null, "Sieger Spiel " + g.nr], l: [null, "Verlierer Spiel " + g.nr]};
   };
-  const ko = (c, x, y) => { const g = G(c); set(g, 1, x[0], x[1]); set(g, 2, y[0], y[1]); };
-  ko("VF1", hr(2), hr(7)); ko("VF2", hr(3), hr(6)); ko("VF3", hr(4), hr(5));
-  ko("DHF1", dr(1), dr(4)); ko("DHF2", dr(2), dr(3));
-  ko("HHF1", hr(1), out("VF3").w); ko("HHF2", out("VF1").w, out("VF2").w);
-  ko("DP3", out("DHF1").l, out("DHF2").l); ko("DF", out("DHF1").w, out("DHF2").w);
-  ko("HP3", out("HHF1").l, out("HHF2").l); ko("HF", out("HHF1").w, out("HHF2").w);
+  const ko = (c, x, y) => { const g = Gc(c); set(g, 1, x[0], x[1]); set(g, 2, y[0], y[1]); };
+  ko("HHF1", br(1), ar(2)); ko("HHF2", ar(1), br(2));
+  ko("HPS1", br(3), ar(4)); ko("HPS2", ar(3), br(4));
+  ko("DHF1", dr(2), dr(3)); ko("DHF2", dr(1), dr(4)); ko("DP5", dr(5), dr(6));
+  ko("HP5", out("HPS2").w, out("HPS1").w); ko("HP7", out("HPS2").l, out("HPS1").l);
+  ko("DP3", out("DHF2").l, out("DHF1").l); ko("DF", out("DHF2").w, out("DHF1").w);
+  ko("HP3", out("HHF2").l, out("HHF1").l); ko("HF", out("HHF2").w, out("HHF1").w);
 
   // Schiedsrichter: erstes Spiel des Tages = Einstellung, sonst die Teams des Vorspiels
   games.forEach((g, i) => {
@@ -125,20 +131,15 @@ export function compute(settings, teams, results) {
 
   // Endstand
   const lab = x => x[0] ? byId[x[0]].name : x[1];
-  const endH = [lab(out("HF").w), lab(out("HF").l), lab(out("HP3").w), lab(out("HP3").l)];
-  const vfs = ["VF1", "VF2", "VF3"];
-  if (vfs.every(c => G(c).decided && G(c).t1 && G(c).t2)) {
-    const losers = vfs.map(c => out(c).l[0]).sort((x, y) => tabG.find(r => r.t.id === x).rank - tabG.find(r => r.t.id === y).rank);
-    losers.forEach(id => endH.push(byId[id].name));
-  } else [5, 6, 7].forEach(k => endH.push(k + ". Platz (Verlierer Viertelfinale)"));
-  const endD = [lab(out("DF").w), lab(out("DF").l), lab(out("DP3").w), lab(out("DP3").l), lab(dr(5)), lab(dr(6))];
-  const endHid = [out("HF").w[0], out("HF").l[0], out("HP3").w[0], out("HP3").l[0]];
+  const pair = (c, pl) => { const o = out(c); return [o.w[0] ? lab(o.w) : pl + ". Platz", o.l[0] ? lab(o.l) : (pl + 1) + ". Platz"]; };
+  const endH = [].concat(pair("HF", 1), pair("HP3", 3), pair("HP5", 5), pair("HP7", 7));
+  const endD = [].concat(pair("DF", 1), pair("DP3", 3), pair("DP5", 5));
 
   games.forEach(g => {
     g.hint = g.partial ? "Ergebnis unvollständig" : (g.ko && g.played && !g.decided ? "Unentschieden – 7m-Schießen eintragen" : "");
   });
-  return {games, tabV, tabG, tabD, completeV, completeG, completeD, endH, endD, settings: S,
-    championH: endHid[0] || null, championD: out("DF").w[0] || null};
+  return {games, tabA, tabB, tabD, completeA, completeB, completeD, endH, endD, settings: S,
+    championH: out("HF").w[0] || null, championD: out("DF").w[0] || null};
 }
 
 /** Startzeit eines Spiels als Zeitstempel (lokale Zeit) */
