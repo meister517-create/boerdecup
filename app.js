@@ -2,18 +2,18 @@
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {initializeFirestore,doc,onSnapshot,setDoc,updateDoc,arrayUnion,arrayRemove,deleteField} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {compute,startTs,defaultTeams,DEFAULT_SETTINGS,H_SEEDS,D_SEEDS} from "./engine.js?v=20261011";
+import {compute,startTs,defaultTeams,DEFAULT_SETTINGS,MODE,GAME_COUNT} from "./engine.js?v=20261013";
 
 var CFG=window.BC_CONFIG||{};
 var LOGO="logo.png";
 var app=document.getElementById("app");
 var STATE=null, RESULTS={games:{},los:{}}, LOGOS={}, USER=null, authReady=false, DRAFT=null, route="home", filter="Alle", atab="results", gsel="", publishing=false, pendingRender=false, resDay=1;
-var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info"];
+var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info","shuttle"];
 
 function norm(s){
   s.settings=Object.assign({},DEFAULT_SETTINGS,s.settings||{});
   if(!Array.isArray(s.teams)||!s.teams.length||!s.teams[0].cat)s.teams=defaultTeams();
-  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];
+  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];s.shuttle=s.shuttle||[];
   return s}
 
 /* ---------- storage helpers ---------- */
@@ -29,7 +29,7 @@ function eur(n){return Number(n||0).toLocaleString("de-DE",{style:"currency",cur
 function clone(o){return JSON.parse(JSON.stringify(o))}
 function S(){return DRAFT||STATE||norm({})}
 function teamById(id){return id?S().teams.find(function(t){return t.id===id}):null}
-function isB2(){return !!STATE&&STATE.mode==="B2"}
+function isB2(){return !!STATE&&STATE.mode===MODE}
 var _C=null,_Ck="";
 function C(){var k=JSON.stringify([S().settings,S().teams,RESULTS]);if(k!==_Ck){_Ck=k;_C=compute(S().settings,S().teams,RESULTS)}return _C}
 function liveInfo(g){if(g.played)return null;var s=startTs(g);if(s===null)return null;var n=Date.now(),D=Math.max(1,g.dur)*60e3;if(n<s||n>=s+D)return null;return{min:Math.floor((n-s)/60e3)+1,p:(n-s)/D}}
@@ -47,7 +47,7 @@ function logo(team,size){
 function gtTeam(g){return g.teamId?teamById(g.teamId):null}
 function gtName(g){var t=gtTeam(g);return t?t.name:(g.name||"Team")}
 function gtLogoObj(g){var t=gtTeam(g);return t||{name:g.name}}
-function seedLabel(t){return "Team "+t.seed}
+function seedLabel(t){return t.cat==="H"?"Gruppe "+String(t.seed).charAt(0)+" · "+t.seed:"Damen "+t.seed}
 
 /* ---------- icons & nav ---------- */
 var ICON={
@@ -87,7 +87,7 @@ function vHome(){
     :nm?'<span>Als Nächstes '+esc(wd(nm))+'um '+esc(nm.time)+' Uhr, '+esc(nm.label)+'</span><strong>'+esc(nm.l1)+'<span class="vs">gegen</span>'+esc(nm.l2)+'</strong>'
     :'<strong>Alle Spiele sind gespielt</strong>';
   var lines=[];
-  if(c.championH)lines.push('Sieger Herren: '+esc(teamById(c.championH).name));else if(c.tabG[0]&&c.tabG[0].sp)lines.push('Herren: '+esc(c.tabG[0].t.name));
+  if(c.championH)lines.push('Sieger Herren: '+esc(teamById(c.championH).name));else if((c.tabA[0]&&c.tabA[0].sp)||(c.tabB[0]&&c.tabB[0].sp))lines.push('Herren: '+esc(c.tabA[0].t.name)+' (A), '+esc(c.tabB[0].t.name)+' (B)');
   if(c.championD)lines.push('Siegerinnen Damen: '+esc(teamById(c.championD).name));else if(c.tabD[0]&&c.tabD[0].sp)lines.push('Damen: '+esc(c.tabD[0].t.name));
   var tbl=lines.length?'<strong>'+lines[0]+'</strong>'+(lines[1]?'<span>'+lines[1]+'</span>':''):'<strong>Noch keine Ergebnisse</strong>';
   var ch=items.filter(function(i){return !i.out}).sort(function(a,b){return a.price-b.price})[0];
@@ -110,28 +110,28 @@ function gameHTML(g,nx){
   return '<div class="game'+(lv?' live':nx?' next':'')+'" data-nr="'+g.nr+'">'+side(t1,g.l1,w1)+mid+side(t2,g.l2,w2)+
     '<div class="refl">Spiel '+g.nr+', Schiedsrichter: '+esc(g.r1===g.r2?g.r1:g.r1+' und '+g.r2)+'</div></div>';
 }
-var PF=["Alle","Herren","Damen","K.-o.-Runde"];
+var PF=["Alle","Herren","Damen","Platzierungsspiele"];
 function vPlan(){
   var c=C(),teamF=filter.indexOf("team:")===0?teamById(filter.slice(5)):null;
   if(!teamF&&PF.indexOf(filter)<0)filter="Alle";
   var nm=nextGame();
   var gs=c.games.filter(function(g){
     if(teamF)return g.t1===teamF.id||g.t2===teamF.id;
-    if(filter==="Herren")return g.cat==="H";if(filter==="Damen")return g.cat==="D";if(filter==="K.-o.-Runde")return g.ko;return true});
+    if(filter==="Herren")return g.cat==="H";if(filter==="Damen")return g.cat==="D";if(filter==="Platzierungsspiele")return g.ko;return true});
   var chips=(teamF?'<button class="chip" data-filter="Alle" aria-pressed="true">'+esc(teamF.name)+' ✕</button>':'')+PF.map(function(o){return '<button class="chip" data-filter="'+esc(o)+'" aria-pressed="'+(!teamF&&o===filter)+'">'+esc(o)+'</button>'}).join("");
   var st=c.settings,curDay=null,koShown=false,html='';
   gs.forEach(function(g){
     if(g.day!==curDay){curDay=g.day;koShown=false;html+='<h2 class="dayh">'+esc(fmtDay(g.date))+'</h2>'+(g.ko?'':'<p class="hint dayhint">'+st.durG+' Min. Spielzeit, '+st.chgG+' Min. Wechsel</p>')}
-    if(g.ko&&!koShown){koShown=true;html+='<h3 class="koh">K.-o.-Runde</h3><p class="hint dayhint">'+st.durK+' Min. Spielzeit, '+st.chgK+' Min. Wechsel</p>'}
+    if(g.ko&&!koShown){koShown=true;html+='<h3 class="koh">Platzierungsspiele</h3><p class="hint dayhint">'+st.durK+' Min. Spielzeit, '+st.chgK+' Min. Wechsel</p>'}
     html+=gameHTML(g,nm&&nm.nr===g.nr)});
   var body=gs.length?'<div class="games">'+html+'</div>':'<div class="empty">In dieser Auswahl gibt es keine Spiele.</div>';
-  return pageHead("Spielplan")+'<main><div class="wrap"><div class="chips" role="group" aria-label="Filter">'+chips+'</div>'+(teamF?'<p class="hint">Spiele mit festgelegten Gegnern. Spiele der Hauptrunde und K.-o.-Runde erscheinen, sobald die Paarung feststeht.</p>':'')+body+'</div></main>'+nav();
+  return pageHead("Spielplan")+'<main><div class="wrap"><div class="chips" role="group" aria-label="Filter">'+chips+'</div>'+(teamF?'<p class="hint">Spiele mit festgelegten Gegnern. Platzierungsspiele am Sonntag erscheinen, sobald die Paarung feststeht.</p>':'')+body+'</div></main>'+nav();
 }
 function vTeams(){
   var tm=S().teams;
   function grid(list){return '<div class="tgrid">'+list.map(function(t){return '<button class="tcard" data-team="'+t.id+'">'+logo(t,84)+'<span class="nm">'+esc(t.name)+'</span></button>'}).join("")+'</div>'}
   return pageHead("Teams")+'<main><div class="wrap"><p class="hint" style="margin-top:0">Tippe auf ein Team, um seine Spiele zu sehen.</p>'+
-    '<h2 class="sec">Herren</h2>'+grid(tm.filter(function(t){return t.cat==="H"}))+'<h2 class="sec">Damen</h2>'+grid(tm.filter(function(t){return t.cat==="D"}))+'</div></main>'+nav();
+    '<h2 class="sec">Herren – Gruppe A</h2>'+grid(tm.filter(function(t){return t.cat==="H"&&String(t.seed).charAt(0)==="A"}))+'<h2 class="sec">Herren – Gruppe B</h2>'+grid(tm.filter(function(t){return t.cat==="H"&&String(t.seed).charAt(0)==="B"}))+'<h2 class="sec">Damen</h2>'+grid(tm.filter(function(t){return t.cat==="D"}))+'</div></main>'+nav();
 }
 function tableHTML(rows,mark){
   return '<div class="tbl-wrap"><table><thead><tr><th>#</th><th class="team">Team</th><th>Sp</th><th>S</th><th>U</th><th>N</th><th>Tore</th><th>Pkt</th></tr></thead><tbody>'+
@@ -142,13 +142,12 @@ function vTable(){
   var c=C(),anyEnd=c.endH.concat(c.endD).some(function(n){return S().teams.some(function(t){return t.name===n})});
   return pageHead("Tabelle")+'<main><div class="wrap">'+
     (anyEnd?'<h2 class="sec">Endstand</h2><div class="endgrid">'+endHTML("Herren",c.endH)+endHTML("Damen",c.endD)+'</div>':'')+
-    '<h2 class="sec">Herren – Gesamt (Vor- und Hauptrunde)</h2>'+tableHTML(c.tabG,true)+
-    '<p class="hint">Grundlage für die K.-o.-Runde: Der Erste steht direkt im Halbfinale, Viertelfinale 2. gegen 7., 3. gegen 6., 4. gegen 5.</p>'+
-    '<h2 class="sec">Herren – Vorrunde</h2>'+tableHTML(c.tabV,false)+
-    '<p class="hint">Die Platzierung nach der Vorrunde bestimmt die Hauptrunde: 1.–4., 2.–5., 3.–6., 7.–1., 4.–2., 5.–3., 6.–7.</p>'+
+    '<h2 class="sec">Herren – Gruppe A</h2>'+tableHTML(c.tabA,true)+
+    '<h2 class="sec">Herren – Gruppe B</h2>'+tableHTML(c.tabB,true)+
+    '<p class="hint">Sonntag: Halbfinale 1. A gegen 2. B und 1. B gegen 2. A, Überkreuzspiele 3. A gegen 4. B und 3. B gegen 4. A. Danach werden alle Plätze von 1 bis 8 ausgespielt.</p>'+
     '<h2 class="sec">Damen</h2>'+tableHTML(c.tabD,true)+
-    '<p class="hint">Grundlage für die K.-o.-Runde: Halbfinale 1. gegen 4. und 2. gegen 3.</p>'+
-    '<p class="hint">Sieg 3 Punkte, Unentschieden 1 Punkt. Bei Gleichstand zählen Tordifferenz, dann erzielte Tore, zuletzt das Los. K.-o.-Spiele werden bei Unentschieden im 7m-Schießen entschieden.</p></div></main>'+nav();
+    '<p class="hint">Sonntag: Halbfinale 1. gegen 4. und 2. gegen 3., Spiel um Platz 5 (5. gegen 6.), Spiel um Platz 3 und Finale.</p>'+
+    '<p class="hint">Sieg 3 Punkte, Unentschieden 1 Punkt. Bei Gleichstand zählen Tordifferenz, dann erzielte Tore, zuletzt das Los. Platzierungsspiele werden bei Unentschieden im 7m-Schießen entschieden.</p></div></main>'+nav();
 }
 function vFood(){
   var body=S().menu.length?S().menu.map(function(c){
@@ -170,10 +169,16 @@ function richText(t){
     if(lines.length>1&&lines[0].length<=40&&!/[.:!?]$/.test(lines[0].trim())){lead='<b class="ilead">'+esc(lines.shift())+'</b>'}
     var h=esc(lines.join("\n")).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\n/g,"<br>");
     return '<p>'+lead+h+'</p>'}).join("")}
+function shuttleHTML(){
+  var L=S().shuttle.filter(function(r){return (r.team||"").trim()});if(!L.length)return "";
+  return '<div class="shl"><h3>Abholzeiten Samstag</h3><p class="shn">Bitte seid ein paar Minuten vor der Abfahrt am Abholort. Teams mit zwei Zeiten teilen sich selbst auf beide Fahrten auf.</p>'+
+    L.map(function(r){return '<div class="shr"><b>'+esc(r.team)+'</b><span class="shp">'+esc(r.place)+'</span><span class="sht">'+esc(r.time)+'</span></div>'}).join("")+'</div>'}
 function vInfo(){
   var secs=S().info.filter(function(s){return (s.title||"").trim()||(s.text||"").trim()});
+  var shIx=secs.findIndex(function(s){return /shuttle/i.test(s.title||"")}),sh=shuttleHTML();
+  if(sh&&shIx<0){secs=secs.concat([{title:"Shuttle",text:"",sh:true}]);shIx=secs.length-1}
   return '<div class="ihead"><div class="wrap"><span class="iconspacer" aria-hidden="true"></span><h1>Infos zum Turnier</h1><button class="iconbtn" data-go="home" aria-label="Schließen">'+ICON.close+'</button></div></div>'+
-    '<main class="ipage"><div class="wrap">'+(secs.length?secs.map(function(s){return '<section class="isec"><h2>'+esc(s.title)+'</h2>'+richText(s.text)+'</section>'}).join(""):'<div class="empty">Hier erscheinen bald alle Infos zum Turnier.</div>')+
+    '<main class="ipage"><div class="wrap">'+(secs.length?secs.map(function(s,i){return '<section class="isec"><h2>'+esc(s.title)+'</h2>'+richText(s.text)+(i===shIx?sh:'')+'</section>'}).join(""):'<div class="empty">Hier erscheinen bald alle Infos zum Turnier.</div>')+
     '<p style="margin-top:28px;text-align:center"><button class="btn ghost" data-go="home">Zurück zur Startseite</button></p></div></main>';
 }
 
@@ -190,8 +195,8 @@ function numIn(id,v,label){return '<input class="in sc" id="'+id+'" inputmode="n
 function aResults(){
   var c=C(),gs=c.games.filter(function(g){return g.day===resDay});
   var done=c.games.filter(function(g){return g.played}).length;
-  var head='<div class="card"><p class="hint" style="margin:0 0 10px">Ergebnisse werden pro Spiel mit „Speichern“ sofort veröffentlicht. Paarungen der Hauptrunde und K.-o.-Runde, Tabellen und Endstand rechnet die App automatisch. Leere Felder bedeuten: noch nicht gespielt.</p>'+
-    '<div class="row" style="flex-wrap:wrap"><span class="badge">'+done+' von 40 Ergebnissen</span><span class="badge'+(c.completeV?' ok':'')+'">Vorrunde Herren '+(c.completeV?'komplett':'läuft')+'</span><span class="badge'+(c.completeG?' ok':'')+'">Hauptrunde Herren '+(c.completeG?'komplett':'offen')+'</span><span class="badge'+(c.completeD?' ok':'')+'">Damen-Gruppe '+(c.completeD?'komplett':'läuft')+'</span></div></div>'+
+  var head='<div class="card"><p class="hint" style="margin:0 0 10px">Ergebnisse werden pro Spiel mit „Speichern“ sofort veröffentlicht. Paarungen der Platzierungsspiele, Tabellen und Endstand rechnet die App automatisch. Leere Felder bedeuten: noch nicht gespielt.</p>'+
+    '<div class="row" style="flex-wrap:wrap"><span class="badge">'+done+' von '+GAME_COUNT+' Ergebnissen</span><span class="badge'+(c.completeA?' ok':'')+'">Gruppe A '+(c.completeA?'komplett':'läuft')+'</span><span class="badge'+(c.completeB?' ok':'')+'">Gruppe B '+(c.completeB?'komplett':'läuft')+'</span><span class="badge'+(c.completeD?' ok':'')+'">Damen-Gruppe '+(c.completeD?'komplett':'läuft')+'</span></div></div>'+
     '<div class="chips" role="group" aria-label="Tag"><button class="chip" data-resday="1" aria-pressed="'+(resDay===1)+'">Samstag</button><button class="chip" data-resday="2" aria-pressed="'+(resDay===2)+'">Sonntag</button><button class="chip" data-resday="0" aria-pressed="'+(resDay===0)+'">Losentscheid</button></div>';
   if(resDay===0)return head+aLos(c);
   return head+'<div class="rows">'+gs.map(function(g){
@@ -207,13 +212,14 @@ function aLos(c){
     return '<div class="card"><h2 class="sec">'+title+'</h2>'+(tied.length?'<p class="hint">Diese Teams sind nach Punkten, Tordifferenz und Toren gleich. Losergebnis eintragen (1 = vorne)'+(complete?'':'. Die Runde läuft noch, ein Los ist erst am Ende nötig')+'.</p>'+
       '<div class="rows">'+tied.map(function(r){return '<div class="row"><span class="grow">'+r.rank+'. '+esc(r.t.name)+' ('+r.p+' Pkt., '+r.tf+':'+r.tg+')</span>'+numIn("los-"+key+"-"+r.t.id,r.los,"Los "+r.t.name)+'</div>'}).join("")+'</div>'+
       '<button class="btn red sm" data-act="saveLos" data-key="'+key+'" style="margin-top:10px">Los speichern</button>':'<p class="hint" style="margin:0">Kein Gleichstand.</p>')+'</div>'}
-  return block("V","Herren Vorrunde",c.tabV,c.completeV)+block("G","Herren Gesamt",c.tabG,c.completeG)+block("D","Damen",c.tabD,c.completeD);
+  return block("A","Herren Gruppe A",c.tabA,c.completeA)+block("B","Herren Gruppe B",c.tabB,c.completeB)+block("D","Damen",c.tabD,c.completeD);
 }
 function aTeams(D){
   function row(t){return '<div class="card"><div class="row"><span class="seed">'+esc(seedLabel(t))+'</span><input class="in grow" data-k="team.name" data-id="'+t.id+'" value="'+esc(t.name)+'" aria-label="Teamname '+esc(seedLabel(t))+'"></div>'+
     '<div class="row" style="margin-top:8px"><div class="upl">'+logo(t,44)+'<label class="btn ghost sm">'+(LOGOS[t.id]?'Logo ändern':'Logo hochladen')+'<input type="file" accept="image/png,image/jpeg" data-logo="'+t.id+'"></label>'+(LOGOS[t.id]?'<button class="btn icon sm" data-act="delLogo" data-id="'+t.id+'">Entfernen</button>':'')+'</div></div></div>'}
-  return '<p class="hint">Die Buchstaben A–G (Herren) und Nummern 1–6 (Damen) kommen aus der Auslosung und legen den Spielplan fest. Hier nur die Namen eintragen. Logos als PNG oder JPG sind sofort live.</p>'+
-    '<h2 class="sec">Herren</h2><div class="rows">'+D.teams.filter(function(t){return t.cat==="H"}).map(row).join("")+'</div>'+
+  return '<p class="hint">Die Plätze A1–A4 und B1–B4 (Herren) und 1–6 (Damen) kommen aus der Auslosung und legen den Spielplan fest. Hier nur die Namen eintragen. Logos als PNG oder JPG sind sofort live.</p>'+
+    '<h2 class="sec">Herren – Gruppe A</h2><div class="rows">'+D.teams.filter(function(t){return t.cat==="H"&&String(t.seed).charAt(0)==="A"}).map(row).join("")+'</div>'+
+    '<h2 class="sec">Herren – Gruppe B</h2><div class="rows">'+D.teams.filter(function(t){return t.cat==="H"&&String(t.seed).charAt(0)==="B"}).map(row).join("")+'</div>'+
     '<h2 class="sec">Damen</h2><div class="rows">'+D.teams.filter(function(t){return t.cat==="D"}).map(row).join("")+'</div>';
 }
 function aInfo(D){
@@ -221,7 +227,12 @@ function aInfo(D){
     D.info.map(function(s,i){return '<div class="card"><div class="row"><input class="in grow" style="font-weight:800" data-k="info.title" data-id="'+s.id+'" value="'+esc(s.title)+'" placeholder="Überschrift" aria-label="Überschrift">'+
       '<button class="btn icon" data-act="infoUp" data-id="'+s.id+'" aria-label="Nach oben"'+(i?'':' disabled')+'>↑</button><button class="btn icon" data-act="infoDown" data-id="'+s.id+'" aria-label="Nach unten"'+(i<D.info.length-1?'':' disabled')+'>↓</button><button class="btn icon" data-act="infoDel" data-id="'+s.id+'" aria-label="Abschnitt löschen">✕</button></div>'+
       '<textarea class="in ta" data-k="info.text" data-id="'+s.id+'" rows="7" placeholder="Text" aria-label="Text">'+esc(s.text)+'</textarea></div>'}).join("")+
-    '</div><button class="btn ghost" data-act="infoAdd">Abschnitt hinzufügen</button>';
+    '</div><button class="btn ghost" data-act="infoAdd">Abschnitt hinzufügen</button>'+
+    '<div class="card" style="margin-top:22px"><h2 class="sec">Shuttle-Abholzeiten (Samstag)</h2><p class="hint">Erscheinen auf der Infoseite im Abschnitt, dessen Überschrift „Shuttle“ enthält. Eine Zeile pro Team, Reihenfolge mit den Pfeilen.</p><div class="rows">'+
+    D.shuttle.map(function(r,i){return '<div style="border-top:1px solid var(--line);padding-top:8px"><div class="row"><input class="in grow" style="font-weight:700" data-k="sh.team" data-id="'+r.id+'" value="'+esc(r.team)+'" placeholder="Team" aria-label="Team">'+
+      '<button class="btn icon" data-act="shUp" data-id="'+r.id+'" aria-label="Nach oben"'+(i?'':' disabled')+'>↑</button><button class="btn icon" data-act="shDown" data-id="'+r.id+'" aria-label="Nach unten"'+(i<D.shuttle.length-1?'':' disabled')+'>↓</button><button class="btn icon" data-act="shDel" data-id="'+r.id+'" aria-label="Zeile löschen">✕</button></div>'+
+      '<div class="row" style="margin-top:6px"><input class="in" style="width:42%" data-k="sh.place" data-id="'+r.id+'" value="'+esc(r.place)+'" placeholder="Abholort" aria-label="Abholort"><input class="in grow" data-k="sh.time" data-id="'+r.id+'" value="'+esc(r.time)+'" placeholder="Abfahrt, z. B. 19:00 (8 Pers.)" aria-label="Abfahrt"></div></div>'}).join("")+
+    '</div><button class="btn ghost sm" data-act="shAdd" style="margin-top:10px">Zeile hinzufügen</button></div>';
 }
 function aFood(D){
   return '<p class="hint">Kategorien, Angebote und Preise. Mit den Pfeilen änderst du die Reihenfolge. Ausverkauftes bleibt sichtbar, aber durchgestrichen.</p>'+D.menu.map(function(c,ci){
@@ -257,14 +268,15 @@ function aGeneral(D){
   function f(k,lab,type,extra){return '<div><label class="f" for="s-'+k+'">'+lab+'</label><input class="in" id="s-'+k+'" type="'+type+'" data-k="set.'+k+'" value="'+esc(s[k])+'"'+(extra||'')+'></div>'}
   return '<div class="card"><h2 class="sec">Turniertage und Uhrzeiten</h2><p class="hint">Aus diesen Angaben berechnet die App alle Anstoßzeiten und die Live-Anzeige.</p>'+
    '<div class="mgrid" style="grid-template-columns:1fr 1fr">'+f("day1","Samstag (Datum)","date")+f("start1","Beginn Samstag","time")+f("day2","Sonntag (Datum)","date")+f("start2","Beginn Sonntag","time")+'</div></div>'+
-   '<div class="card"><h2 class="sec">Spielzeiten</h2><div class="mgrid" style="grid-template-columns:1fr 1fr">'+f("durG","Spielzeit Vor-/Haupt-/Gruppenrunde","number",' min="1"')+f("chgG","Wechselzeit","number",' min="0"')+f("durK","Spielzeit K.-o.-Runde","number",' min="1"')+f("chgK","Wechselzeit K.-o.-Runde","number",' min="0"')+'</div>'+
-   '<p class="hint" style="margin:12px 0 0">Ende Samstag: '+fmtEnd(g[22])+' Uhr. Sonntag: K.-o.-Runde ab '+g[29].time+' Uhr, Ende '+fmtEnd(g[39])+' Uhr.</p></div>'+
+   '<div class="card"><h2 class="sec">Spielzeiten</h2><div class="mgrid" style="grid-template-columns:1fr 1fr">'+f("durG","Spielzeit Gruppenspiele","number",' min="1"')+f("chgG","Wechselzeit","number",' min="0"')+f("durK","Spielzeit Platzierungsspiele","number",' min="1"')+f("chgK","Wechselzeit Platzierungsspiele","number",' min="0"')+'</div>'+
+   '<p class="hint" style="margin:12px 0 0">Ende Samstag: '+fmtEnd(lastOf(g,1))+' Uhr. Sonntag: Platzierungsspiele ab '+g.filter(function(x){return x.ko})[0].time+' Uhr, Ende '+fmtEnd(lastOf(g,2))+' Uhr.</p></div>'+
    '<div class="card">'+f("refFirst","Schiedsrichter im ersten Spiel des Tages","text")+f("date","Datum als Text auf der Startseite","text",' placeholder="z. B. 24. und 25. Oktober 2026"')+f("place","Ort","text")+'</div>'+
    '<p class="hint">Veröffentlichte Änderungen erscheinen bei allen Besuchern sofort, ohne Neuladen.</p>';
 }
+function lastOf(gs,d){return gs.filter(function(x){return x.day===d}).slice(-1)[0]}
 function fmtEnd(g){var m=g.start+g.dur;return String(Math.floor(m/60)%24).padStart(2,"0")+":"+String(m%60).padStart(2,"0")}
 function vMigrate(){
-  return '<div class="card"><h2 class="sec">Neuer Turniermodus</h2><p class="hint">Die Datenbank enthält noch den alten Spielplan mit festen Gruppen. Mit dem Umstellen werden 7 Herren-Teams (A–G) und 6 Damen-Teams (1–6) im Modus Vor-/Hauptrunde und K.-o.-Runde angelegt. Getränkekarte und Thekengold-Buchungen bleiben erhalten, Teamnamen und Ergebnisse werden zurückgesetzt.</p>'+
+  return '<div class="card"><h2 class="sec">Neuer Turniermodus</h2><p class="hint">Die Datenbank enthält noch den Spielplan mit 7 Herren-Teams. Mit dem Umstellen gilt der neue Plan: Herren in zwei Gruppen (A1–A4, B1–B4), Damen als 6er-Gruppe, am Sonntag werden alle Plätze ausgespielt. Die Teams werden nach der aktuellen Auslosung eingetragen, Logos und Thekengold-Buchungen werden per Teamname übernommen. Getränkekarte und Infos bleiben erhalten, der Abschnitt „Turnierkonzept“ wird aktualisiert und die Shuttle-Abholzeiten werden angelegt. Ergebnisse werden zurückgesetzt.</p>'+
     '<button class="btn red" data-act="migrate">Auf neuen Turniermodus umstellen</button></div>';
 }
 function pick(s){var o={};MAIN_FIELDS.forEach(function(k){o[k]=s[k]});return o}
@@ -320,6 +332,7 @@ app.addEventListener("input",function(e){
   else if(k==="gt.name")DRAFT.goldTeams.find(function(g){return g.id===id}).name=v;
   else if(k==="info.title")DRAFT.info.find(function(s){return s.id===id}).title=v;
   else if(k==="info.text")DRAFT.info.find(function(s){return s.id===id}).text=v;
+  else if(k.indexOf("sh.")===0)DRAFT.shuttle.find(function(r){return r.id===id})[k.slice(3)]=v;
   else if(k.indexOf("set.")===0){var f=k.slice(4);DRAFT.settings[f]=["durG","chgG","durK","chgK"].indexOf(f)>=0?Math.max(0,parseInt(v,10)||0):v}
   markDirty();
 });
@@ -352,8 +365,7 @@ async function publish(){
 }
 function laterPhaseStarted(g){
   var c=C();
-  if(g.code==="HV")return c.games.some(function(x){return (x.code==="HH"||x.ko&&x.cat==="H")&&(x.played||x.partial)});
-  if(g.code==="HH")return c.games.some(function(x){return x.ko&&x.cat==="H"&&(x.played||x.partial)});
+  if(g.code==="HA"||g.code==="HB")return c.games.some(function(x){return x.ko&&x.cat==="H"&&(x.played||x.partial)});
   if(g.code==="D")return c.games.some(function(x){return x.ko&&x.cat==="D"&&(x.played||x.partial)});
   if(g.ko)return c.games.some(function(x){return x.ko&&x.nr>g.nr&&x.cat===g.cat&&(x.played||x.partial)});
   return false;
@@ -372,7 +384,7 @@ function saveRes(nr,clear){
   setDoc(refs.results,{games:games,updated:new Date().toISOString()},{merge:true}).then(function(){toast(h===null?"Spiel "+nr+" geleert":"Spiel "+nr+" gespeichert: "+h+":"+a)}).catch(writeErr);
 }
 function saveLos(key){
-  var c=C(),rows={V:c.tabV,G:c.tabG,D:c.tabD}[key],o={};
+  var c=C(),rows={A:c.tabA,B:c.tabB,D:c.tabD}[key],o={};
   for(var i=0;i<rows.length;i++){var r=rows[i];if(!r.tie)continue;var v=parseScore("los-"+key+"-"+r.t.id);
     if(typeof v==="number"&&isNaN(v)){toast("Bitte nur Zahlen eintragen.");return}o[r.t.id]=v===null?deleteField():v}
   var los={};los[key]=o;
@@ -398,7 +410,7 @@ app.addEventListener("click",function(e){
   if(a==="publish"){publish();return}
   if(a==="reset"){if(confirm("Alle unveröffentlichten Änderungen verwerfen?")){lsSet("bc-draft",null);DRAFT=norm(clone(STATE));render(true)}return}
   if(a==="seed"){seed();return}
-  if(a==="migrate"){if(confirm("Jetzt auf den neuen Turniermodus umstellen? Teamnamen und Ergebnisse werden zurückgesetzt."))migrate();return}
+  if(a==="migrate"){if(confirm("Jetzt auf den neuen Spielplan (2 Herren-Gruppen) umstellen? Ergebnisse werden zurückgesetzt."))migrate();return}
   if(a==="saveRes"){saveRes(+t.dataset.nr,false);return}
   if(a==="clrRes"){if(confirm("Ergebnis von Spiel "+t.dataset.nr+" wirklich löschen?"))saveRes(+t.dataset.nr,true);return}
   if(a==="saveLos"){saveLos(t.dataset.key);return}
@@ -414,6 +426,9 @@ app.addEventListener("click",function(e){
   else if(a==="infoDel"){if(!confirm("Abschnitt „"+(I[ix].title||"")+"“ löschen?"))return;I.splice(ix,1)}
   else if(a==="infoUp"&&ix>0){I.splice(ix-1,0,I.splice(ix,1)[0])}
   else if(a==="infoDown"&&ix>=0&&ix<I.length-1){I.splice(ix+1,0,I.splice(ix,1)[0])}
+  else if(a==="shAdd"){DRAFT.shuttle.push({id:uid("t"),team:"",place:"Stadthalle",time:""})}
+  else if(a==="shDel"){DRAFT.shuttle=DRAFT.shuttle.filter(function(r){return r.id!==id})}
+  else if(a==="shUp"||a==="shDown"){var Sh=DRAFT.shuttle,si=Sh.findIndex(function(r){return r.id===id}),sj=si+(a==="shUp"?-1:1);if(si<0||sj<0||sj>=Sh.length)return;Sh.splice(sj,0,Sh.splice(si,1)[0])}
   else if(a==="catUp"||a==="catDown"){var M=DRAFT.menu,ci=M.findIndex(function(c){return c.id===id}),cj=ci+(a==="catUp"?-1:1);if(ci<0||cj<0||cj>=M.length)return;M.splice(cj,0,M.splice(ci,1)[0])}
   else if(a==="itUp"||a==="itDown"){var it=findC(t.dataset.cid).items,ii=it.findIndex(function(x){return x.id===id}),ij=ii+(a==="itUp"?-1:1);if(ii<0||ij<0||ij>=it.length)return;it.splice(ij,0,it.splice(ii,1)[0])}
   else if(a==="addCat"){DRAFT.menu.push({id:uid("c"),name:"Neue Kategorie",items:[]})}
@@ -473,18 +488,41 @@ function vWaiting(){
   else if(slowLoad)msg='Die Verbindung zur Datenbank dauert ungewöhnlich lange. Prüfe in Firebase, ob die Firestore-Datenbank angelegt ist und die Werte in config.js stimmen.';
   else{msg='Die Seite wird geladen …';btn=''}
   return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>40. Soester Börde-Cup</h1><p>'+msg+'</p>'+btn+'</div></main>'}
-function vSetup(){return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>Ersteinrichtung</h1><p>Die Datenbank ist noch leer. Lege die Startdaten an: 7 Herren- und 6 Damen-Teams, den Spielplan für beide Tage, eine Beispielkarte und Infotexte.</p><button class="btn red" style="width:100%" data-act="seed">Startdaten anlegen</button><p style="margin-top:14px"><button class="btn ghost sm" data-act="logout">Abmelden</button></p></div></main>'}
+function vSetup(){return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>Ersteinrichtung</h1><p>Die Datenbank ist noch leer. Lege die Startdaten an: 8 Herren- und 6 Damen-Teams, den Spielplan für beide Tage, eine Beispielkarte und Infotexte.</p><button class="btn red" style="width:100%" data-act="seed">Startdaten anlegen</button><p style="margin-top:14px"><button class="btn ghost sm" data-act="logout">Abmelden</button></p></div></main>'}
 var DEFAULT_MENU=[{"id":"c1","name":"Getränke","items":[{"id":"i1","name":"Bier 0,3 l","price":2.5,"note":"","out":false},{"id":"i2","name":"Radler 0,3 l","price":2.5,"note":"","out":false},{"id":"i3","name":"Softdrinks 0,3 l","price":2,"note":"Cola, Fanta, Sprite","out":false},{"id":"i4","name":"Wasser 0,5 l","price":1.5,"note":"","out":false},{"id":"i5","name":"Kaffee","price":1.5,"note":"","out":false}]},{"id":"c2","name":"Essen","items":[{"id":"i6","name":"Bratwurst im Brötchen","price":3.5,"note":"","out":false},{"id":"i7","name":"Pommes","price":3,"note":"Mayo oder Ketchup","out":false},{"id":"i8","name":"Kuchen","price":2,"note":"selbst gebacken","out":false}]}];
+var CONCEPT_TEXT="Damen (6 Teams)\nJede gegen jede, also 5 Gruppenspiele pro Team (12 Spiele am Samstag, 3 am Sonntagmorgen). Danach Halbfinale (1. gegen 4., 2. gegen 3.), Spiel um Platz 5 (5. gegen 6.), Spiel um Platz 3 und Finale.\n\nHerren (8 Teams)\nZwei Gruppen mit je 4 Teams, jede gegen jede, also 3 Gruppenspiele pro Team, alle am Samstag. Am Sonntag: Halbfinale 1. A gegen 2. B und 1. B gegen 2. A, Überkreuzspiele 3. A gegen 4. B und 3. B gegen 4. A. Danach Spiele um Platz 7, 5 und 3 und das Finale, es werden alle Plätze ausgespielt.\n\nSpielzeiten\nGruppenspiele: 20 Minuten Spielzeit, 5 Minuten Wechsel. Platzierungsspiele am Sonntag: 17 Minuten Spielzeit, 5 Minuten Wechsel. Samstag von 9:00 bis ca. 18:55 Uhr, Sonntag von 9:00 bis ca. 15:00 Uhr.\n\nWertung\nSieg 3 Punkte, Unentschieden 1 Punkt. Bei Punktgleichheit entscheiden Tordifferenz, dann mehr erzielte Tore, zuletzt das Los. Platzierungsspiele werden bei Unentschieden im 7m-Schießen entschieden.\n\nSchiedsrichter\nDas erste Spiel am Samstag und am Sonntag pfeifen zwei Schiedsrichter aus Soest, danach pfeifen immer die beiden Teams aus dem vorherigen Spiel. Bitte bleibt nach eurem Spiel direkt am Platz.";
 var DEFAULT_INFO=[
- {id:"s1",title:"Turnierkonzept",text:"Damen (6 Teams)\nJede gegen jede, also 5 Spiele pro Team. Danach Halbfinale (1. gegen 4., 2. gegen 3.), Spiel um Platz 3 und Finale. Platz 5 und 6 ergeben sich aus der Tabelle.\n\nHerren (7 Teams)\nVorrunde: Jedes Team bestreitet 2 Spiele.\nHauptrunde: Je nach Platzierung nach der Vorrunde folgen 2 weitere Spiele nach festem Schema (1.–4., 2.–5., 3.–6., 7.–1., 4.–2., 5.–3., 6.–7.). Dabei kann es auch zu einem Wiedersehen aus der Vorrunde kommen. Punkte und Tore aus Vor- und Hauptrunde zählen zusammen.\nK.-o.-Runde: Der Erste ist direkt fürs Halbfinale gesetzt. Viertelfinale 2. gegen 7., 3. gegen 6., 4. gegen 5. Danach Halbfinale, Spiel um Platz 3 und Finale. Die Verlierer der Viertelfinals belegen die Plätze 5 bis 7 nach ihrer Tabellenplatzierung.\n\nSpielzeiten\nVorrunde, Hauptrunde und Damen-Gruppe: 20 Minuten Spielzeit, 5 Minuten Wechsel. K.-o.-Spiele am Sonntag: 17 Minuten Spielzeit, 3 Minuten Wechsel.\n\nWertung\nSieg 3 Punkte, Unentschieden 1 Punkt. Bei Punktgleichheit entscheiden Tordifferenz, dann mehr erzielte Tore, zuletzt das Los. K.-o.-Spiele werden bei Unentschieden im 7m-Schießen entschieden.\n\nSchiedsrichter\nDas erste Spiel des Tages pfeift Soest, danach pfeifen immer die beiden Teams aus dem vorherigen Spiel. Bitte bleibt nach eurem Spiel direkt am Platz."},
+ {id:"s1",title:"Turnierkonzept",text:CONCEPT_TEXT},
  {id:"s2",title:"Party",text:"Die Infos zur Party folgen."},
- {id:"s3",title:"Anfahrt und Kontakt",text:"Adresse und Ansprechpartner folgen."}];
+ {id:"s3",title:"Allgemeines und Infos zum Shuttle",text:"Adresse und Ansprechpartner folgen."}];
+// Auslosung (Stand 13.10.2026, Spielplan_Modell2_final.xlsx)
+var DRAW={H:{A1:"Soester HC",A2:"Steglitzer TK",A3:"Schlick Town and Friends",A4:"THC Münster",B1:"Dortmunder Kronen",B2:"Wilde 13",B3:"HC Kopinnacken",B4:"TG Heimfeld"},
+  D:{1:"Soester HC",2:"Wilde 13",3:"Kamucitas",4:"Dortmunder Kronen",5:"HC Buer",6:"HC Drömelig"}};
+// Shuttle Samstag zur Schützenhalle Ampen (2 Großraumtaxis, Stand 13.10.2026)
+var DEFAULT_SHUTTLE=[
+ ["Dortmunder Kronen Herren","Stadthalle","19:00"],
+ ["Wilde 13 Herren","Stadthalle","19:00 (8 Pers.) und 19:20 (2 Pers.)"],
+ ["Steglitzer TK","Bahnhof","19:20"],
+ ["Wilde 13 Damen","Stadthalle","19:20 (6 Pers.) und 19:40 (4 Pers.)"],
+ ["THC Münster","Hanse-Hotel","19:35 (8 Pers.) und 19:45 (2 Pers.)"],
+ ["HC Drömelig","Stadthalle","19:40 (4 Pers.) und 20:00 (6 Pers.)"],
+ ["Kamucitas","Hanse-Hotel","19:45 (6 Pers.) und 19:55 (4 Pers.)"],
+ ["Schlick Town and Friends","Stadthalle","20:00 (2 Pers.) und 20:10 (8 Pers.)"],
+ ["HC Kopinnacken","Stadthalle","20:20 (8 Pers.) und 20:30 (3 Pers.)"],
+ ["TG Heimfeld","Stadthalle","20:30 (5 Pers.) und 20:40 (2 Pers.)"],
+ ["Dortmunder Kronen Damen","Stadthalle","20:40 (6 Pers.) und 20:50 (5 Pers.)"],
+ ["HC Buer","Stadthalle","20:50 (3 Pers.) und 21:00 (7 Pers.)"],
+ ["Soester HC Herren und Damen","–","eigene Anreise"]].map(function(r,i){return {id:"t"+(i+1),team:r[0],place:r[1],time:r[2]}});
+function nkey(n){return String(n||"").toLowerCase().replace(/[^a-z0-9äöüß]/g,"")}
 function newMain(old){
-  var teams=defaultTeams(),keepGold=(old&&old.goldTeams||[]).filter(function(g){return !g.teamId});
-  var s=Object.assign({},DEFAULT_SETTINGS);if(old&&old.settings){if(old.settings.place)s.place=old.settings.place;if(old.settings.date)s.date=old.settings.date}
-  return {mode:"B2",settings:s,teams:teams,menu:(old&&old.menu&&old.menu.length)?old.menu:DEFAULT_MENU,
+  var teams=defaultTeams();teams.forEach(function(t){var n=t.cat==="H"?DRAW.H[t.seed]:DRAW.D[t.seed];if(n)t.name=n});
+  var keepGold=(old&&old.goldTeams||[]).filter(function(g){return !g.teamId});
+  var s=Object.assign({},DEFAULT_SETTINGS);if(old&&old.settings){["place","date","day1","day2","start1","start2","refFirst"].forEach(function(k){if(old.settings[k])s[k]=old.settings[k]})}
+  var info=(old&&old.info&&old.info.length)?clone(old.info):clone(DEFAULT_INFO);
+  var ci=info.findIndex(function(x){return /turnierkonzept/i.test(x.title||"")});if(ci>=0)info[ci].text=CONCEPT_TEXT;else info.unshift({id:"s1",title:"Turnierkonzept",text:CONCEPT_TEXT});
+  return {mode:MODE,settings:s,teams:teams,menu:(old&&old.menu&&old.menu.length)?old.menu:DEFAULT_MENU,
     goldTeams:teams.map(function(t){return {id:"g"+t.id,teamId:t.id,name:""}}).concat(keepGold),
-    info:(old&&old.info&&old.info.length)?old.info:DEFAULT_INFO,updated:new Date().toISOString()};
+    info:info,shuttle:clone(DEFAULT_SHUTTLE),updated:new Date().toISOString()};
 }
 async function seed(){
   if(STATE||!mainLoaded)return;
@@ -493,7 +531,18 @@ async function seed(){
   catch(err){writeErr(err)}
 }
 async function migrate(){
-  try{await setDoc(refs.main,newMain(STATE));await setDoc(refs.results,{games:{},los:{}});lsSet("bc-draft",null);DRAFT=null;toast("Turniermodus umgestellt")}
+  var old=STATE,oldTeams=(old&&old.teams)||[],oldGold=(old&&old.goldTeams)||[],log=(old&&old.goldLog)||[],m=newMain(old),nl={};
+  // Logos und Thekengold-Teams per Teamname übernehmen (Buchungen hängen an der Thekengold-ID)
+  m.goldTeams=m.teams.map(function(t){
+    var o=oldTeams.find(function(x){return x.cat===t.cat&&nkey(x.name)===nkey(t.name)});
+    if(o&&LOGOS[o.id])nl[t.id]=LOGOS[o.id];
+    var og=o&&oldGold.find(function(g){return g.teamId===o.id});
+    return {id:og?og.id:"g"+t.id,teamId:t.id,name:""}}).concat(oldGold.filter(function(g){return !g.teamId}));
+  oldGold.forEach(function(g){if(g.teamId&&!m.goldTeams.some(function(x){return x.id===g.id})&&log.some(function(e){return e.g===g.id})){
+    var o=oldTeams.find(function(x){return x.id===g.teamId});m.goldTeams.push({id:g.id,teamId:"",name:o?o.name:"Team"})}});
+  try{await setDoc(refs.main,m);await setDoc(refs.results,{games:{},los:{}});
+    if(Object.keys(LOGOS).length)await setDoc(refs.logos,nl);
+    lsSet("bc-draft",null);DRAFT=null;toast("Neuer Spielplan ist live")}
   catch(err){writeErr(err)}
 }
 var fbError="",refs={},auth=null,mainLoaded=false,slowLoad=false;
