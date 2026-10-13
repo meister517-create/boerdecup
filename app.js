@@ -157,11 +157,12 @@ function vFood(){
   return pageHead("Essen & Getränke")+'<main><div class="wrap">'+body+'</div></main>'+nav();
 }
 function vGold(){
-  var r=goldTotals(),max=r.length?r[0].v:0,up=S().goldUpdated?new Date(S().goldUpdated):null;
+  var r=goldTotals(),max=r.length?r[0].v:0,lg=S().goldLog||[],up=lg.length?new Date(Math.max.apply(null,lg.map(function(e){return +e.ts||0}))):null;
+  var upTxt=up?(up.toDateString()===new Date().toDateString()?'heute, ':'am '+up.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})+', ')+up.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+' Uhr':'';
   var body=r.length?'<div class="glist">'+r.map(function(x,i){var w=max>0?Math.max(x.v>0?6:0,x.v/max*100):0;
     return '<div class="gbar r'+(i+1)+'"><span class="rk">'+(i+1)+'</span><div class="hd">'+logo(gtLogoObj(x.g),30)+'<b>'+esc(gtName(x.g))+'</b></div><div class="trk"><div class="fl" style="--w:'+w.toFixed(1)+'%"></div></div></div>'}).join("")+'</div>'
    :'<div class="empty">Noch ist kein Team im Rennen. Die Theke wartet.</div>';
-  return pageHead("Thekengold")+'<main><div class="wrap"><p class="livestat"><i></i>Live-Stand'+(up?', aktualisiert '+up.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+' Uhr':'')+'</p>'+body+'</div></main>'+nav();
+  return pageHead("Thekengold")+'<main><div class="wrap"><p class="livestat"><i></i>Live-Stand'+(upTxt?' · letzte Buchung '+upTxt:'')+'</p>'+body+'</div></main>'+nav();
 }
 function richText(t){
   return String(t||"").trim().split(/\n\s*\n/).map(function(p){
