@@ -7,13 +7,14 @@ import {compute,startTs,defaultTeams,DEFAULT_SETTINGS,MODE,GAME_COUNT} from "./e
 var CFG=window.BC_CONFIG||{};
 var LOGO="logo.png";
 var app=document.getElementById("app");
+var DEFAULT_QUICK=[{id:"q1",label:"Bier",price:2.5},{id:"q2",label:"Biermeter",price:25},{id:"q3",label:"Kamu",price:3},{id:"q4",label:"Kamumeter",price:30}];
 var STATE=null, RESULTS={games:{},los:{}}, LOGOS={}, USER=null, authReady=false, DRAFT=null, route="home", filter="Alle", atab="results", gsel="", publishing=false, pendingRender=false, resDay=1;
-var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info","shuttle"];
+var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info","shuttle","goldQuick"];
 
 function norm(s){
   s.settings=Object.assign({},DEFAULT_SETTINGS,s.settings||{});
   if(!Array.isArray(s.teams)||!s.teams.length||!s.teams[0].cat)s.teams=defaultTeams();
-  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];s.shuttle=s.shuttle||[];
+  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];s.shuttle=s.shuttle||[];if(!Array.isArray(s.goldQuick))s.goldQuick=clone(DEFAULT_QUICK);
   return s}
 
 /* ---------- storage helpers ---------- */
@@ -252,17 +253,24 @@ function aGold(D){
   var last=D.goldLog[D.goldLog.length-1],lastG=last&&D.goldTeams.find(function(g){return g.id===last.g});
   var sum=D.goldLog.reduce(function(s,e){return s+(+e.a||0)},0);
   var log=D.goldLog.slice(-15).reverse().map(function(e){var g=D.goldTeams.find(function(x){return x.id===e.g});
-    return '<div><time>'+new Date(e.ts).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+'</time><span>'+esc(g?gtName(g):"gelöschtes Team")+'</span><b>'+eur(e.a)+'</b><button class="btn icon sm" data-act="delBook" data-id="'+e.id+'" aria-label="Buchung löschen">✕</button></div>'}).join("");
+    return '<div><time>'+new Date(e.ts).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+'</time><span>'+esc(g?gtName(g):"gelöschtes Team")+(e.n?'<small class="lgn"> · '+esc(e.n)+'</small>':'')+'</span><b>'+eur(e.a)+'</b><button class="btn icon sm" data-act="delBook" data-id="'+e.id+'" aria-label="Buchung löschen">✕</button></div>'}).join("");
   return '<div class="card"><h2 class="sec">Verzehrkarte buchen</h2><p class="hint">Team wählen, dann Betrag tippen. Jede Buchung ist sofort live. Im Frontend sieht man nur die Platzierung, keine Beträge.</p>'+
    (D.goldTeams.length?'<div class="gteams">'+D.goldTeams.map(function(g){return '<button class="gbtn" data-act="gsel" data-id="'+g.id+'" aria-pressed="'+(g.id===gsel)+'">'+logo(gtLogoObj(g),30)+'<span>'+esc(gtName(g))+'<small>'+eur(tot[g.id]||0)+'</small></span></button>'}).join("")+'</div>'
      :'<div class="empty">Füge unten zuerst Teams zum Thekengold hinzu.</div>')+
-   '<label class="f" style="margin-top:16px">Betrag</label><div class="amts">'+[10,20,30,50].map(function(a){return '<button class="amt" data-act="book" data-a="'+a+'"'+(gsel?'':' disabled')+'>'+a+' €</button>'}).join("")+'</div>'+
-   '<div class="row" style="margin-top:10px"><input class="in grow" id="custom" inputmode="decimal" placeholder="Eigener Betrag in €" aria-label="Eigener Betrag"><button class="btn red" data-act="bookCustom"'+(gsel?'':' disabled')+'>Buchen</button></div>'+
-   '<button class="btn ghost" data-act="undo" style="width:100%;margin-top:12px"'+(last?'':' disabled')+'>'+(last?'Rückgängig: '+esc(lastG?gtName(lastG):"Team")+', '+eur(last.a):'Nichts rückgängig zu machen')+'</button></div>'+
+   '<label class="f" style="margin-top:16px">Getränke</label><div class="amts drinks">'+D.goldQuick.filter(function(q){return (q.label||"").trim()&&q.price>0}).map(function(q){return '<button class="amt dk" data-act="bookQ" data-id="'+q.id+'"'+(gsel?'':' disabled')+'>'+esc(q.label)+'<small>'+eur(q.price)+'</small></button>'}).join("")+
+     '<button class="amt dk alt" data-act="other"'+(gsel?'':' disabled')+'>Sonstiges<small>Betrag eingeben</small></button></div>'+
+   '<label class="f" style="margin-top:16px">Verzehrkarte</label><div class="amts">'+[10,20,30,50].map(function(a){return '<button class="amt" data-act="book" data-a="'+a+'"'+(gsel?'':' disabled')+'>'+a+' €</button>'}).join("")+'</div>'+
+   '<div class="row" style="margin-top:10px"><input class="in grow" id="custom" inputmode="decimal" placeholder="Sonstiges: Betrag in €" aria-label="Sonstiger Betrag"><button class="btn red" data-act="bookCustom"'+(gsel?'':' disabled')+'>Buchen</button></div>'+
+   '<button class="btn ghost" data-act="undo" style="width:100%;margin-top:12px"'+(last?'':' disabled')+'>'+(last?'Rückgängig: '+esc(lastG?gtName(lastG):"Team")+(last.n?' ('+esc(last.n)+')':'')+', '+eur(last.a):'Nichts rückgängig zu machen')+'</button></div>'+
    '<div class="card"><h2 class="sec">Letzte Buchungen</h2>'+(log?'<div class="log">'+log+'</div><p class="hint" style="margin:10px 0 0">Gesamt '+eur(sum)+' aus '+D.goldLog.length+' Buchungen.</p>':'<p class="hint" style="margin:0">Noch keine Buchungen.</p>')+'</div>'+
    '<div class="card"><h2 class="sec">Teams im Thekengold</h2><p class="hint">Turnierteams übernehmen Name und Logo automatisch. Zusätzliche Teams kannst du frei anlegen.</p><div class="rows">'+
    D.goldTeams.map(function(g){var t=gtTeam(g);return '<div class="row">'+logo(gtLogoObj(g),34)+(t?'<span class="grow" style="font-weight:650">'+esc(t.name)+'</span>':'<input class="in grow" data-k="gt.name" data-id="'+g.id+'" value="'+esc(g.name)+'" aria-label="Teamname">')+'<button class="btn icon" data-act="delGt" data-id="'+g.id+'" aria-label="Aus Thekengold entfernen">✕</button></div>'}).join("")+
-   '</div><div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn ghost sm" data-act="addGt">Team hinzufügen</button><button class="btn ghost sm" data-act="importGt">Turnierteams übernehmen</button></div></div>';
+   '</div><div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn ghost sm" data-act="addGt">Team hinzufügen</button><button class="btn ghost sm" data-act="importGt">Turnierteams übernehmen</button></div></div>'+
+   '<div class="card"><h2 class="sec">Getränke-Buttons bearbeiten</h2><p class="hint">Name und Preis der Schnellbuttons oben. Reihenfolge mit den Pfeilen, Änderungen mit „Veröffentlichen“ speichern. „Sonstiges“ ist immer dabei.</p><div class="rows">'+
+   D.goldQuick.map(function(q,i){return '<div style="border-top:1px solid var(--line);padding-top:8px"><div class="row"><input class="in grow" style="font-weight:700" data-k="gq.label" data-id="'+q.id+'" value="'+esc(q.label)+'" placeholder="Getränk" aria-label="Getränk">'+
+     '<input class="in" style="width:84px;text-align:right" inputmode="decimal" data-k="gq.price" data-id="'+q.id+'" value="'+String(q.price).replace(".",",")+'" aria-label="Preis in Euro"><span>€</span></div>'+
+     '<div class="row" style="margin-top:6px;justify-content:flex-end"><button class="btn icon" data-act="gqUp" data-id="'+q.id+'" aria-label="Nach oben"'+(i?'':' disabled')+'>↑</button><button class="btn icon" data-act="gqDown" data-id="'+q.id+'" aria-label="Nach unten"'+(i<D.goldQuick.length-1?'':' disabled')+'>↓</button><button class="btn icon" data-act="gqDel" data-id="'+q.id+'" aria-label="Button löschen">✕</button></div></div>'}).join("")+
+   '</div><button class="btn ghost sm" data-act="gqAdd" style="margin-top:10px">Button hinzufügen</button></div>';
 }
 function aGeneral(D){
   var s=D.settings,c=compute(s,D.teams,RESULTS),g=c.games;
@@ -333,6 +341,8 @@ app.addEventListener("input",function(e){
   else if(k==="gt.name")DRAFT.goldTeams.find(function(g){return g.id===id}).name=v;
   else if(k==="info.title")DRAFT.info.find(function(s){return s.id===id}).title=v;
   else if(k==="info.text")DRAFT.info.find(function(s){return s.id===id}).text=v;
+  else if(k==="gq.label")DRAFT.goldQuick.find(function(q){return q.id===id}).label=v;
+  else if(k==="gq.price"){var gp=parseNum(v);DRAFT.goldQuick.find(function(q){return q.id===id}).price=gp===null?0:gp}
   else if(k.indexOf("sh.")===0)DRAFT.shuttle.find(function(r){return r.id===id})[k.slice(3)]=v;
   else if(k.indexOf("set.")===0){var f=k.slice(4);DRAFT.settings[f]=["durG","chgG","durK","chgK"].indexOf(f)>=0?Math.max(0,parseInt(v,10)||0):v}
   markDirty();
@@ -391,12 +401,12 @@ function saveLos(key){
   var los={};los[key]=o;
   setDoc(refs.results,{los:los},{merge:true}).then(function(){toast("Losentscheid gespeichert")}).catch(writeErr);
 }
-function book(a){
+function book(a,n){
   if(!gsel||!(a>0))return;var g=DRAFT.goldTeams.find(function(x){return x.id===gsel});
-  var e={id:uid("b"),g:gsel,a:Math.round(a*100)/100,ts:Date.now()};
+  var e={id:uid("b"),g:gsel,a:Math.round(a*100)/100,ts:Date.now()};if(n)e.n=n;
   updateDoc(refs.gold,{log:arrayUnion(e),updated:new Date().toISOString()}).catch(writeErr);
   var c=document.getElementById("custom");if(c)c.value="";
-  toast("Gebucht: "+gtName(g)+", "+eur(a));
+  toast("Gebucht: "+gtName(g)+(n?", "+n:"")+", "+eur(a));
 }
 
 app.addEventListener("click",function(e){
@@ -417,7 +427,9 @@ app.addEventListener("click",function(e){
   if(a==="saveLos"){saveLos(t.dataset.key);return}
   if(a==="gsel"){gsel=gsel===id?"":id;saveResume();render(true);return}
   if(a==="book"){book(+t.dataset.a);return}
-  if(a==="bookCustom"){var v=parseNum(document.getElementById("custom").value);if(!(v>0)){toast("Bitte einen Betrag über 0 € eingeben.");return}book(v);return}
+  if(a==="bookCustom"){var v=parseNum(document.getElementById("custom").value);if(!(v>0)){toast("Bitte einen Betrag über 0 € eingeben.");return}book(v,"Sonstiges");return}
+  if(a==="bookQ"){var q=DRAFT.goldQuick.find(function(x){return x.id===id});if(q&&q.price>0)book(q.price,q.label);return}
+  if(a==="other"){var ci=document.getElementById("custom");if(ci){ci.focus();ci.scrollIntoView({block:"center"})}return}
   if(a==="undo"){var l=STATE.goldLog[STATE.goldLog.length-1];if(!l)return;var lg=STATE.goldTeams.find(function(x){return x.id===l.g});
     updateDoc(refs.gold,{log:arrayRemove(l),updated:new Date().toISOString()}).then(function(){toast("Rückgängig: "+(lg?gtName(lg):"Team")+", "+eur(l.a))}).catch(writeErr);return}
   if(a==="delBook"){if(!confirm("Diese Buchung löschen?"))return;var bk=STATE.goldLog.find(function(x){return x.id===id});if(bk)updateDoc(refs.gold,{log:arrayRemove(bk),updated:new Date().toISOString()}).then(function(){toast("Buchung gelöscht")}).catch(writeErr);return}
@@ -427,6 +439,9 @@ app.addEventListener("click",function(e){
   else if(a==="infoDel"){if(!confirm("Abschnitt „"+(I[ix].title||"")+"“ löschen?"))return;I.splice(ix,1)}
   else if(a==="infoUp"&&ix>0){I.splice(ix-1,0,I.splice(ix,1)[0])}
   else if(a==="infoDown"&&ix>=0&&ix<I.length-1){I.splice(ix+1,0,I.splice(ix,1)[0])}
+  else if(a==="gqAdd"){DRAFT.goldQuick.push({id:uid("q"),label:"",price:0})}
+  else if(a==="gqDel"){DRAFT.goldQuick=DRAFT.goldQuick.filter(function(q){return q.id!==id})}
+  else if(a==="gqUp"||a==="gqDown"){var Q=DRAFT.goldQuick,qi=Q.findIndex(function(q){return q.id===id}),qj=qi+(a==="gqUp"?-1:1);if(qi<0||qj<0||qj>=Q.length)return;Q.splice(qj,0,Q.splice(qi,1)[0])}
   else if(a==="shAdd"){DRAFT.shuttle.push({id:uid("t"),team:"",place:"Stadthalle",time:""})}
   else if(a==="shDel"){DRAFT.shuttle=DRAFT.shuttle.filter(function(r){return r.id!==id})}
   else if(a==="shUp"||a==="shDown"){var Sh=DRAFT.shuttle,si=Sh.findIndex(function(r){return r.id===id}),sj=si+(a==="shUp"?-1:1);if(si<0||sj<0||sj>=Sh.length)return;Sh.splice(sj,0,Sh.splice(si,1)[0])}

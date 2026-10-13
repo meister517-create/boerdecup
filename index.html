@@ -184,6 +184,11 @@ h2.sec{font-size:1.15rem;font-weight:800;margin:6px 0 10px;font-stretch:100%}
 .amts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .amt{border:0;border-radius:14px;background:var(--red);color:#fff;font-weight:900;font-size:1.25rem;padding:16px 0;cursor:pointer;font-variant-numeric:tabular-nums}
 .amt:disabled{opacity:.35;cursor:default}
+.amts.drinks{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.amt.dk{font-size:1rem;padding:12px 6px;line-height:1.15;background:var(--turf)}
+.amt.dk small{display:block;font-weight:600;font-size:.82rem;opacity:.9;margin-top:2px}
+.amt.dk.alt{background:var(--muted)}
+.lgn{color:var(--muted);font-weight:500}
 .log{display:grid;gap:0}
 .log div{display:grid;grid-template-columns:3.2rem 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:.92rem}
 .log time{color:var(--muted);font-variant-numeric:tabular-nums}
@@ -297,6 +302,6 @@ label.f{display:block;font-size:.85rem;font-weight:600;margin:12px 0 5px}
 <body>
 <div id="app"></div>
 <script src="config.js?v=20261013"></script>
-<script type="module" src="app.js?v=20261013c"></script>
+<script type="module" src="app.js?v=20261013d"></script>
 </body>
 </html>
