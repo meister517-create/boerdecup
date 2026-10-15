@@ -173,8 +173,8 @@ function richText(t){
     return '<p>'+lead+h+'</p>'}).join("")}
 function shuttleHTML(){
   var L=S().shuttle.filter(function(r){return (r.team||"").trim()});if(!L.length)return "";
-  return '<div class="shl"><h3>Abholzeiten Samstag</h3><p class="shn">Bitte seid ein paar Minuten vor der Abfahrt am Abholort. Teams mit zwei Zeiten teilen sich selbst auf beide Fahrten auf.</p>'+
-    L.map(function(r){return '<div class="shr"><b>'+esc(r.team)+'</b><span class="shp">'+esc(r.place)+'</span><span class="sht">'+esc(r.time)+'</span></div>'}).join("")+'</div>'}
+  return '<div class="shl"><h3>Abholzeiten Samstag</h3><p class="shn">Taxi 1 und Taxi 2 fahren ab Hotel am Wall, Taxi 3 ab City Motel und Hanse-Hotel. Bitte seid ein paar Minuten vor der Abfahrt am Abholort. Teams mit mehreren Fahrten teilen sich selbst auf.</p>'+
+    L.map(function(r){return '<div class="shr"><b>'+esc(r.team)+'</b><span class="shp">'+esc(r.place)+'</span>'+String(r.time||"").split(/\s*·\s*/).map(function(x){return '<span class="sht">'+esc(x)+'</span>'}).join("")+'</div>'}).join("")+'</div>'}
 function vInfo(){
   var secs=S().info.filter(function(s){return (s.title||"").trim()||(s.text||"").trim()});
   var shIx=secs.findIndex(function(s){return /shuttle/i.test(s.title||"")}),sh=shuttleHTML();
@@ -230,10 +230,10 @@ function aInfo(D){
       '<button class="btn icon" data-act="infoUp" data-id="'+s.id+'" aria-label="Nach oben"'+(i?'':' disabled')+'>↑</button><button class="btn icon" data-act="infoDown" data-id="'+s.id+'" aria-label="Nach unten"'+(i<D.info.length-1?'':' disabled')+'>↓</button><button class="btn icon" data-act="infoDel" data-id="'+s.id+'" aria-label="Abschnitt löschen">✕</button></div>'+
       '<textarea class="in ta" data-k="info.text" data-id="'+s.id+'" rows="7" placeholder="Text" aria-label="Text">'+esc(s.text)+'</textarea></div>'}).join("")+
     '</div><button class="btn ghost" data-act="infoAdd">Abschnitt hinzufügen</button>'+
-    '<div class="card" style="margin-top:22px"><h2 class="sec">Shuttle-Abholzeiten (Samstag)</h2><p class="hint">Erscheinen auf der Infoseite im Abschnitt, dessen Überschrift „Shuttle“ enthält. Eine Zeile pro Team, Reihenfolge mit den Pfeilen.</p><div class="rows">'+
+    '<div class="card" style="margin-top:22px"><h2 class="sec">Shuttle-Abholzeiten (Samstag)</h2><p class="hint">Erscheinen auf der Infoseite im Abschnitt, dessen Überschrift „Shuttle“ enthält. Eine Zeile pro Team, Reihenfolge mit den Pfeilen. Mehrere Abfahrten mit „ · “ trennen, dann stehen sie untereinander.</p><button class="btn ghost sm" data-act="shLoad" style="margin-bottom:10px">Shuttle-Plan vom '+SHUTTLE_STAND+' übernehmen (3 Taxis)</button><div class="rows">'+
     D.shuttle.map(function(r,i){return '<div style="border-top:1px solid var(--line);padding-top:8px"><div class="row"><input class="in grow" style="font-weight:700" data-k="sh.team" data-id="'+r.id+'" value="'+esc(r.team)+'" placeholder="Team" aria-label="Team">'+
       '<button class="btn icon" data-act="shUp" data-id="'+r.id+'" aria-label="Nach oben"'+(i?'':' disabled')+'>↑</button><button class="btn icon" data-act="shDown" data-id="'+r.id+'" aria-label="Nach unten"'+(i<D.shuttle.length-1?'':' disabled')+'>↓</button><button class="btn icon" data-act="shDel" data-id="'+r.id+'" aria-label="Zeile löschen">✕</button></div>'+
-      '<div class="row" style="margin-top:6px"><input class="in" style="width:42%" data-k="sh.place" data-id="'+r.id+'" value="'+esc(r.place)+'" placeholder="Abholort" aria-label="Abholort"><input class="in grow" data-k="sh.time" data-id="'+r.id+'" value="'+esc(r.time)+'" placeholder="Abfahrt, z. B. 19:00 (8 Pers.)" aria-label="Abfahrt"></div></div>'}).join("")+
+      '<div class="row" style="margin-top:6px"><input class="in" style="width:42%" data-k="sh.place" data-id="'+r.id+'" value="'+esc(r.place)+'" placeholder="Abholort" aria-label="Abholort"><input class="in grow" data-k="sh.time" data-id="'+r.id+'" value="'+esc(r.time)+'" placeholder="z. B. 19:00 Taxi 1 (8 Pers.) · 19:20 Taxi 2 (2 Pers.)" aria-label="Abfahrt"></div></div>'}).join("")+
     '</div><button class="btn ghost sm" data-act="shAdd" style="margin-top:10px">Zeile hinzufügen</button></div>';
 }
 function aFood(D){
@@ -440,6 +440,7 @@ app.addEventListener("click",function(e){
   else if(a==="gqAdd"){DRAFT.goldQuick.push({id:uid("q"),label:"",price:0})}
   else if(a==="gqDel"){DRAFT.goldQuick=DRAFT.goldQuick.filter(function(q){return q.id!==id})}
   else if(a==="gqUp"||a==="gqDown"){var Q=DRAFT.goldQuick,qi=Q.findIndex(function(q){return q.id===id}),qj=qi+(a==="gqUp"?-1:1);if(qi<0||qj<0||qj>=Q.length)return;Q.splice(qj,0,Q.splice(qi,1)[0])}
+  else if(a==="shLoad"){if(!confirm("Die Abholzeiten durch den Shuttle-Plan vom "+SHUTTLE_STAND+" (3 Taxis) ersetzen? Danach noch „Veröffentlichen“ tippen."))return;DRAFT.shuttle=clone(DEFAULT_SHUTTLE)}
   else if(a==="shAdd"){DRAFT.shuttle.push({id:uid("t"),team:"",place:"Stadthalle",time:""})}
   else if(a==="shDel"){DRAFT.shuttle=DRAFT.shuttle.filter(function(r){return r.id!==id})}
   else if(a==="shUp"||a==="shDown"){var Sh=DRAFT.shuttle,si=Sh.findIndex(function(r){return r.id===id}),sj=si+(a==="shUp"?-1:1);if(si<0||sj<0||sj>=Sh.length)return;Sh.splice(sj,0,Sh.splice(si,1)[0])}
@@ -513,19 +514,21 @@ var DEFAULT_INFO=[
 var DRAW={H:{A1:"Soester HC",A2:"Steglitzer TK",A3:"Schlick Town and Friends",A4:"THC Münster",B1:"Dortmunder Kronen",B2:"Wilde 13",B3:"HC Kopinnacken",B4:"TG Heimfeld"},
   D:{1:"Soester HC",2:"Wilde 13",3:"Kamucitas",4:"Dortmunder Kronen",5:"HC Buer",6:"HC Drömelig"}};
 // Shuttle Samstag zur Schützenhalle Ampen (2 Großraumtaxis, Stand 13.10.2026)
+// Shuttle Samstag zur Schützenhalle Ampen (3 Taxis, Stand 15.10.2026)
+var SHUTTLE_STAND="15.10.";
 var DEFAULT_SHUTTLE=[
- ["Dortmunder Kronen Herren","Stadthalle","19:00"],
- ["Wilde 13 Herren","Stadthalle","19:00 (8 Pers.) und 19:20 (2 Pers.)"],
- ["Steglitzer TK","Bahnhof","19:20"],
- ["Wilde 13 Damen","Stadthalle","19:20 (6 Pers.) und 19:40 (4 Pers.)"],
- ["THC Münster","Hanse-Hotel","19:35 (8 Pers.) und 19:45 (2 Pers.)"],
- ["HC Drömelig","Stadthalle","19:40 (4 Pers.) und 20:00 (6 Pers.)"],
- ["Kamucitas","Hanse-Hotel","19:45 (6 Pers.) und 19:55 (4 Pers.)"],
- ["Schlick Town and Friends","Stadthalle","20:00 (2 Pers.) und 20:10 (8 Pers.)"],
- ["HC Kopinnacken","Stadthalle","20:20 (8 Pers.) und 20:30 (3 Pers.)"],
- ["TG Heimfeld","Stadthalle","20:30 (5 Pers.) und 20:40 (2 Pers.)"],
- ["Dortmunder Kronen Damen","Stadthalle","20:40 (6 Pers.) und 20:50 (5 Pers.)"],
- ["HC Buer","Stadthalle","20:50 (3 Pers.) und 21:00 (7 Pers.)"],
+ ["Steglitzer TK","City Motel","19:00 Taxi 3 (5 Pers.) · 19:40 Taxi 3 (3 Pers.)"],
+ ["Wilde 13 Herren","Hotel am Wall","19:00 Taxi 1 (8 Pers.) · 19:20 Taxi 1 (2 Pers.)"],
+ ["Dortmunder Kronen Herren","Hotel am Wall","19:00 Taxi 2 (8 Pers.)"],
+ ["THC Münster","Hanse-Hotel","19:15 Taxi 3 (5 Pers.) · 19:25 Taxi 3 (5 Pers.)"],
+ ["Wilde 13 Damen","Hotel am Wall","19:20 Taxi 1 (6 Pers.) · 19:20 Taxi 2 (4 Pers.)"],
+ ["HC Drömelig","Hotel am Wall","19:20 Taxi 2 (4 Pers.) · 19:40 Taxi 1 (6 Pers.)"],
+ ["Schlick Town and Friends","Hotel am Wall","19:40 Taxi 1 (2 Pers.) · 19:40 Taxi 2 (8 Pers.)"],
+ ["TG Heimfeld","City Motel","19:40 Taxi 3 (2 Pers.) · 20:00 Taxi 3 (5 Pers.)"],
+ ["HC Kopinnacken","Hotel am Wall","20:00 Taxi 1 (8 Pers.) · 20:00 Taxi 2 (3 Pers.)"],
+ ["HC Buer","Hotel am Wall","20:00 Taxi 2 (5 Pers.) · 20:20 Taxi 1 (5 Pers.)"],
+ ["Kamucitas","Hanse-Hotel","20:25 Taxi 3 (5 Pers.) · 20:35 Taxi 3 (5 Pers.)"],
+ ["Dortmunder Kronen Damen","Hotel am Wall","20:40 Taxi 1 (8 Pers.) · 20:40 Taxi 2 (3 Pers.)"],
  ["Soester HC Herren und Damen","–","eigene Anreise"]].map(function(r,i){return {id:"t"+(i+1),team:r[0],place:r[1],time:r[2]}});
 function nkey(n){return String(n||"").toLowerCase().replace(/[^a-z0-9äöüß]/g,"")}
 function newMain(old){
