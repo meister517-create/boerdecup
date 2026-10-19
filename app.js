@@ -66,7 +66,7 @@ var ICON={
 var NAV=[["home","Start"],["plan","Spielplan"],["teams","Teams"],["table","Tabelle"],["food","Essen"],["gold","Thekengold"]];
 function nav(){return '<nav class="bn" aria-label="Hauptnavigation"><div class="wrap">'+NAV.map(function(p){
   return '<button data-go="'+p[0]+'"'+(route===p[0]?' aria-current="page"':'')+'>'+ICON[p[0]]+'<span>'+p[1]+'</span></button>'}).join("")+'</div></nav>'}
-function pageHead(t){return '<div class="ph"><div class="wrap"><img src="'+LOGO+'" alt="Zur Startseite" role="button" tabindex="0" data-go="home"><h1>'+t+'</h1></div></div>'}
+function pageHead(t,back){return '<div class="ph"><div class="wrap"><img src="'+LOGO+'" alt="Zur Startseite" role="button" tabindex="0" data-go="home"><h1>'+t+'</h1>'+(back?'<button class="phback" data-go="home" aria-label="Zurück zur Startseite">'+ICON.back+'</button>':'')+'</div></div>'}
 
 function goldTotals(){
   var tot={};S().goldTeams.forEach(function(g){tot[g.id]=0});
@@ -205,7 +205,7 @@ function shiftResults(q){
   return out.length?'<p class="hint" style="margin:0 0 8px"><b>'+out.length+' Schicht'+(out.length===1?'':'en')+'</b> für „'+esc(q)+'“ an beiden Tagen</p><div class="shrlist">'+out.join("")+'</div>':'<p class="hint">Keine Schicht für „'+esc(q)+'“ gefunden.</p>'}
 function shiftsOk(){return lsGet("bc-shifts")===SHIFT_PW}
 function vShifts(){
-  if(!shiftsOk())return pageHead("Schichtpläne")+'<main><div class="wrap"><form id="shf" class="card shlock"><h2 class="sec">Geschützter Bereich</h2><p class="hint">Bitte das Passwort für die Schichtpläne eingeben.</p>'+
+  if(!shiftsOk())return pageHead("Schichtpläne",true)+'<main><div class="wrap"><form id="shf" class="card shlock"><h2 class="sec">Geschützter Bereich</h2><p class="hint">Bitte das Passwort für die Schichtpläne eingeben.</p>'+
     '<label class="f" for="shpw">Passwort</label><input class="in" id="shpw" type="password" inputmode="numeric" autocomplete="off" required>'+
     '<button class="btn red" type="submit" style="width:100%;margin-top:14px">Öffnen</button><div class="err" id="sherr" role="alert"></div></form></div></main>'+nav();
   var st=S(),c=C(),sh=st.shifts||{},slots=shiftSlots(shDay),date=c.games.filter(function(g){return g.day===shDay})[0];
@@ -216,7 +216,7 @@ function vShifts(){
     var rows=AREAS.filter(function(a){return !areaOff(st,shDay,h,a.id)}).map(function(a){var ns=shiftNames(st,shDay,h,a);all.push.apply(all,ns);
       return '<div class="shrow"><span class="sha">'+esc(a.name)+'</span><span class="shn2'+(ns.length<a.n?' open':'')+'">'+(ns.length?ns.map(esc).join(", "):'')+(ns.length<a.n?(ns.length?' · ':'')+(a.n-ns.length)+' offen':'')+'</span></div>'}).join("");
     return '<section class="shc'+(isNow?' now':'')+'" data-n="'+esc(all.join(" ").toLowerCase())+'"><h3>'+hh(h)+' – '+hh(h+1)+' Uhr'+(isNow?'<span class="pill lv"><i></i>Jetzt</span>':'')+'</h3>'+(rows||'<p class="hint" style="margin:4px 0 0">Keine Schicht in dieser Stunde.</p>')+'</section>'}).join("");
-  return pageHead("Schichtpläne")+'<main><div class="wrap">'+
+  return pageHead("Schichtpläne",true)+'<main><div class="wrap">'+
     '<label class="f" for="shq" style="margin-top:0">Meine Schichten</label><input class="in" id="shq" type="search" value="'+esc(shQ)+'" placeholder="Deinen Namen eingeben …" aria-label="Eigenen Namen suchen" style="margin:0 0 12px">'+
     '<div id="shres">'+shiftResults(shQ)+'</div>'+
     '<div id="shall"'+(shQ.trim()?' style="display:none"':'')+'>'+chips+(slots.length?'<div class="shlist">'+cards+'</div>':'<div class="empty">Noch keine Schichten.</div>')+'</div>'+
