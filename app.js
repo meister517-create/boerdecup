@@ -7,14 +7,16 @@ import {compute,startTs,defaultTeams,DEFAULT_SETTINGS,MODE,GAME_COUNT} from "./e
 var CFG=window.BC_CONFIG||{};
 var LOGO="logo.png";
 var app=document.getElementById("app");
+var SHIFT_PW="1996",shDay=1;
+var AREAS=[{id:"caf",name:"Cafeteria",n:2},{id:"grill",name:"Grill- und Bierstand",n:2},{id:"spk",name:"Sprecherkabine",n:1}];
 var DEFAULT_QUICK=[{id:"q1",label:"Bier",price:2.5},{id:"q2",label:"Biermeter",price:25},{id:"q3",label:"Kamu",price:3},{id:"q4",label:"Kamumeter",price:30}];
 var STATE=null, RESULTS={games:{},los:{}}, LOGOS={}, USER=null, authReady=false, DRAFT=null, route="home", filter="Alle", atab="results", gsel="", publishing=false, pendingRender=false, resDay=1;
-var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info","shuttle","goldQuick"];
+var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info","shuttle","shuttleStand","goldQuick","shifts"];
 
 function norm(s){
   s.settings=Object.assign({},DEFAULT_SETTINGS,s.settings||{});
   if(!Array.isArray(s.teams)||!s.teams.length||!s.teams[0].cat)s.teams=defaultTeams();
-  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];s.shuttle=s.shuttle||[];if(!Array.isArray(s.goldQuick))s.goldQuick=clone(DEFAULT_QUICK);
+  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];s.shuttle=s.shuttle||[];if(s.shuttleStand!==SHUTTLE_STAND){s.shuttle=clone(DEFAULT_SHUTTLE);s.shuttleStand=SHUTTLE_STAND}if(!Array.isArray(s.goldQuick))s.goldQuick=clone(DEFAULT_QUICK);if(!s.shifts||typeof s.shifts!=="object"||Array.isArray(s.shifts))s.shifts={};
   return s}
 
 /* ---------- storage helpers ---------- */
@@ -97,7 +99,7 @@ function vHome(){
   var teams='<div class="lgs">'+tm.slice(0,6).map(function(t){return logo(t)}).join("")+'</div><strong>'+tm.length+' Teams</strong>';
   var gold=gr.length?'<strong>'+esc(gtName(gr[0].g))+'</strong><span>liegt an der Theke vorn</span>':'<strong>Wer holt das Gold?</strong><span>Die Theke ist eröffnet</span>';
   return hero()+'<main><div class="wrap"><div class="tiles">'+tile("plan","Spielplan",plan,"big")+tile("table","Tabelle",tbl,"")+tile("food","Essen & Getränke",food,"")+tile("teams","Teams",teams,"")+tile("gold","Thekengold",gold,"gold")+
-   '</div><p class="foot">40. Soester Börde-Cup des Soester Hockey-Club e.V.<br><button data-go="admin">Orga-Bereich</button></p></div></main>'+nav();
+   '</div><p class="foot">40. Soester Börde-Cup des Soester Hockey-Club e.V.<br><button data-go="admin">Orga-Bereich</button><br><button data-go="shifts">Schichtpläne</button></p></div></main>'+nav();
 }
 function gameHTML(g,nx){
   var sc=g.played,lv=liveInfo(g),t1=teamById(g.t1),t2=teamById(g.t2);
@@ -184,6 +186,32 @@ function vInfo(){
     '<p style="margin-top:28px;text-align:center"><button class="btn ghost" data-go="home">Zurück zur Startseite</button></p></div></main>';
 }
 
+/* ---------- Schichtpläne ---------- */
+function hh(h){return String(h).padStart(2,"0")+":00"}
+function shiftSlots(day){
+  var gs=C().games.filter(function(g){return g.day===day});if(!gs.length)return [];
+  var l=gs[gs.length-1],a=Math.floor(gs[0].start/60),b=Math.ceil((l.start+l.dur)/60),out=[];
+  for(var h=a;h<b;h++)out.push(h);return out}
+function shiftKey(day,h,area,i){return day+"-"+String(h).padStart(2,"0")+"|"+area+"|"+i}
+function shiftsOk(){return lsGet("bc-shifts")===SHIFT_PW}
+function vShifts(){
+  if(!shiftsOk())return pageHead("Schichtpläne")+'<main><div class="wrap"><form id="shf" class="card shlock"><h2 class="sec">Geschützter Bereich</h2><p class="hint">Bitte das Passwort für die Schichtpläne eingeben.</p>'+
+    '<label class="f" for="shpw">Passwort</label><input class="in" id="shpw" type="password" inputmode="numeric" autocomplete="off" required>'+
+    '<button class="btn red" type="submit" style="width:100%;margin-top:14px">Öffnen</button><div class="err" id="sherr" role="alert"></div></form></div></main>'+nav();
+  var st=S(),c=C(),sh=st.shifts||{},slots=shiftSlots(shDay),date=c.games.filter(function(g){return g.day===shDay})[0];
+  var now=new Date(),today=date&&date.date?(function(p){return new Date(+p[0],p[1]-1,+p[2]).toDateString()})(date.date.split("-")):"";
+  var chips='<div class="chips" role="group" aria-label="Tag"><button class="chip" data-shday="1" aria-pressed="'+(shDay===1)+'">Samstag</button><button class="chip" data-shday="2" aria-pressed="'+(shDay===2)+'">Sonntag</button></div>';
+  var cards=slots.map(function(h){
+    var isNow=today===now.toDateString()&&now.getHours()===h,all=[];
+    var rows=AREAS.map(function(a){var ns=[];for(var i=0;i<a.n;i++){var v=(sh[shiftKey(shDay,h,a.id,i)]||"").trim();if(v){ns.push(v);all.push(v)}}
+      return '<div class="shrow"><span class="sha">'+esc(a.name)+'</span><span class="shn2'+(ns.length<a.n?' open':'')+'">'+(ns.length?ns.map(esc).join(", "):'')+(ns.length<a.n?(ns.length?' · ':'')+(a.n-ns.length)+' offen':'')+'</span></div>'}).join("");
+    return '<section class="shc'+(isNow?' now':'')+'" data-n="'+esc(all.join(" ").toLowerCase())+'"><h3>'+hh(h)+' – '+hh(h+1)+' Uhr'+(isNow?'<span class="pill lv"><i></i>Jetzt</span>':'')+'</h3>'+rows+'</section>'}).join("");
+  return pageHead("Schichtpläne")+'<main><div class="wrap">'+chips+
+    '<input class="in" id="shq" type="search" placeholder="Name suchen …" aria-label="Nach Namen suchen" style="margin:4px 0 12px">'+
+    '<p class="hint" id="shnone" style="display:none">Keine Schicht mit diesem Namen an diesem Tag.</p>'+
+    (slots.length?'<div class="shlist">'+cards+'</div>':'<div class="empty">Noch keine Schichten.</div>')+
+    '<p style="margin-top:22px;text-align:center"><button class="btn ghost sm" data-act="shLock">Bereich wieder sperren</button></p></div></main>'+nav()}
+
 /* ---------- admin views ---------- */
 function vLogin(){
   return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>Orga-Bereich</h1><p>Anmelden, um den Börde-Cup zu pflegen.</p>'+
@@ -192,7 +220,7 @@ function vLogin(){
   '<button class="btn red" style="width:100%;margin-top:18px" type="submit">Anmelden</button><div class="err" id="lerr" role="alert"></div></form>'+
   '<p style="margin-top:18px"><button class="btn ghost sm" data-go="home">Zur Startseite</button></p></div></main>';
 }
-var ATABS=[["results","Ergebnisse"],["gold","Thekengold"],["teams","Teams"],["info","Infos"],["food","Essen & Getränke"],["general","Allgemein"]];
+var ATABS=[["results","Ergebnisse"],["gold","Thekengold"],["teams","Teams"],["info","Infos"],["shifts","Schichten"],["food","Essen & Getränke"],["general","Allgemein"]];
 function numIn(id,v,label){return '<input class="in sc" id="'+id+'" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="'+(v==null?"":v)+'" aria-label="'+label+'">'}
 function aResults(){
   var c=C(),gs=c.games.filter(function(g){return g.day===resDay});
@@ -271,6 +299,16 @@ function aGold(D){
      '<div class="row" style="margin-top:6px;justify-content:flex-end"><button class="btn icon" data-act="gqUp" data-id="'+q.id+'" aria-label="Nach oben"'+(i?'':' disabled')+'>↑</button><button class="btn icon" data-act="gqDown" data-id="'+q.id+'" aria-label="Nach unten"'+(i<D.goldQuick.length-1?'':' disabled')+'>↓</button><button class="btn icon" data-act="gqDel" data-id="'+q.id+'" aria-label="Button löschen">✕</button></div></div>'}).join("")+
    '</div><button class="btn ghost sm" data-act="gqAdd" style="margin-top:10px">Button hinzufügen</button></div>';
 }
+function aShifts(D){
+  var slots=shiftSlots(shDay),sh=D.shifts,open=0,tot=0;
+  var cards=slots.map(function(h){
+    return '<div class="card"><h2 class="sec" style="margin-bottom:8px">'+hh(h)+' – '+hh(h+1)+' Uhr</h2>'+AREAS.map(function(a){
+      var ins='';for(var i=0;i<a.n;i++){var k=shiftKey(shDay,h,a.id,i),v=sh[k]||"";tot++;if(!v.trim())open++;
+        ins+='<input class="in grow" data-k="shift" data-id="'+k+'" value="'+esc(v)+'" placeholder="Name" aria-label="'+esc(a.name)+' '+hh(h)+' Person '+(i+1)+'">'}
+      return '<div style="margin-top:8px"><label class="f" style="margin:0 0 4px">'+esc(a.name)+'</label><div class="row">'+ins+'</div></div>'}).join("")+'</div>'}).join("");
+  return '<p class="hint">Schichten je volle Stunde, passend zum Spielplan des Tages. Cafeteria und Grill- und Bierstand mit je zwei Personen, Sprecherkabine mit einer. Mit „Veröffentlichen“ speichern. Im Frontend unten auf der Startseite unter „Schichtpläne“, Passwort '+SHIFT_PW+'.</p>'+
+    '<div class="chips" role="group" aria-label="Tag"><button class="chip" data-shday="1" aria-pressed="'+(shDay===1)+'">Samstag</button><button class="chip" data-shday="2" aria-pressed="'+(shDay===2)+'">Sonntag</button></div>'+
+    '<p class="hint"><span class="badge" id="shbadge">'+(tot-open)+' von '+tot+' Plätzen belegt</span></p><div class="rows">'+cards+'</div>'}
 function aGeneral(D){
   var s=D.settings,c=compute(s,D.teams,RESULTS),g=c.games;
   function f(k,lab,type,extra){return '<div><label class="f" for="s-'+k+'">'+lab+'</label><input class="in" id="s-'+k+'" type="'+type+'" data-k="set.'+k+'" value="'+esc(s[k])+'"'+(extra||'')+'></div>'}
@@ -291,8 +329,8 @@ function pick(s){var o={};MAIN_FIELDS.forEach(function(k){o[k]=s[k]});return o}
 function isDirty(){return !!DRAFT&&!!STATE&&JSON.stringify(pick(DRAFT))!==JSON.stringify(pick(STATE))}
 function vAdmin(){
   var D=DRAFT,d=isDirty();
-  var body=!isB2()?vMigrate():({results:aResults,teams:aTeams,food:aFood,gold:aGold,info:aInfo,general:aGeneral}[atab]||aResults)(D);
-  var draftTab=["teams","food","info","general"].indexOf(atab)>=0||(atab==="gold");
+  var body=!isB2()?vMigrate():({results:aResults,teams:aTeams,food:aFood,gold:aGold,info:aInfo,shifts:aShifts,general:aGeneral}[atab]||aResults)(D);
+  var draftTab=["teams","food","info","general","shifts"].indexOf(atab)>=0||(atab==="gold");
   return '<div class="ph"><div class="wrap"><img src="'+LOGO+'" alt="Zur Startseite" role="button" tabindex="0" data-go="home"><h1>Orga</h1><button class="btn ghost sm out" data-act="logout">Abmelden</button></div>'+
    '<div class="wrap"><div class="atabs">'+ATABS.map(function(a){return '<button class="chip" data-atab="'+a[0]+'" aria-pressed="'+(a[0]===atab)+'">'+a[1]+'</button>'}).join("")+'</div></div></div>'+
    '<main style="padding-bottom:120px"><div class="wrap">'+body+'</div></main>'+
@@ -310,7 +348,7 @@ function render(keep){
     if(!STATE){app.innerHTML=vSetup();return}
     if(!DRAFT)DRAFT=loadDraft();app.innerHTML=vAdmin()}
   else if(!STATE||!isB2()){app.innerHTML=vWaiting()}
-  else{DRAFT=null;app.innerHTML=({home:vHome,plan:vPlan,teams:vTeams,table:vTable,food:vFood,gold:vGold,info:vInfo}[route]||vHome)()}
+  else{DRAFT=null;app.innerHTML=({home:vHome,plan:vPlan,teams:vTeams,table:vTable,food:vFood,gold:vGold,info:vInfo,shifts:vShifts}[route]||vHome)()}
   if(keep)window.scrollTo(0,y);
 }
 function go(r){route=r;saveResume();render(false);window.scrollTo(0,0);if(r==="plan"){var g=document.querySelector(".game.live")||document.querySelector(".game.next");if(g&&g.getBoundingClientRect().top>innerHeight*.6)g.scrollIntoView({block:"center"})}}
@@ -332,6 +370,7 @@ function parseNum(v){v=String(v).trim().replace(",",".");if(v==="")return null;v
 function parseScore(id){var el=document.getElementById(id);if(!el)return undefined;var v=el.value.trim();if(v==="")return null;if(!/^\d{1,2}$/.test(v))return NaN;return parseInt(v,10)}
 
 app.addEventListener("input",function(e){
+  if(e.target.id==="shq"){var q=e.target.value.trim().toLowerCase(),vis=0;document.querySelectorAll(".shc").forEach(function(c){var ok=!q||c.dataset.n.indexOf(q)>=0;c.style.display=ok?"":"none";if(ok)vis++});var nn=document.getElementById("shnone");if(nn)nn.style.display=vis?"none":"";return}
   var el=e.target,k=el.dataset.k;if(!k||!DRAFT)return;var id=el.dataset.id,v=el.type==="checkbox"?el.checked:el.value;
   if(k==="team.name")DRAFT.teams.find(function(t){return t.id===id}).name=v;
   else if(k.indexOf("it.")===0){var c=findC(el.dataset.cid),it=c.items.find(function(i){return i.id===id}),g=k.slice(3);
@@ -340,6 +379,7 @@ app.addEventListener("input",function(e){
   else if(k==="gt.name")DRAFT.goldTeams.find(function(g){return g.id===id}).name=v;
   else if(k==="info.title")DRAFT.info.find(function(s){return s.id===id}).title=v;
   else if(k==="info.text")DRAFT.info.find(function(s){return s.id===id}).text=v;
+  else if(k==="shift"){if(String(v).trim())DRAFT.shifts[id]=v;else delete DRAFT.shifts[id];var ins=document.querySelectorAll('[data-k="shift"]'),fil=0;ins.forEach(function(x){if(x.value.trim())fil++});var bd=document.getElementById("shbadge");if(bd)bd.textContent=fil+" von "+ins.length+" Plätzen belegt"}
   else if(k==="gq.label")DRAFT.goldQuick.find(function(q){return q.id===id}).label=v;
   else if(k==="gq.price"){var gp=parseNum(v);DRAFT.goldQuick.find(function(q){return q.id===id}).price=gp===null?0:gp}
   else if(k.indexOf("sh.")===0)DRAFT.shuttle.find(function(r){return r.id===id})[k.slice(3)]=v;
@@ -409,13 +449,15 @@ function book(a,n){
 }
 
 app.addEventListener("click",function(e){
-  var t=e.target.closest("[data-go],[data-filter],[data-atab],[data-act],[data-team],[data-resday]");if(!t)return;
+  var t=e.target.closest("[data-go],[data-filter],[data-atab],[data-act],[data-team],[data-resday],[data-shday]");if(!t)return;
+  if(t.dataset.shday){shDay=+t.dataset.shday;render(true);return}
   if(t.dataset.go){go(t.dataset.go);return}
   if(t.dataset.team){filter="team:"+t.dataset.team;go("plan");return}
   if(t.dataset.filter){filter=t.dataset.filter;saveResume();render(true);return}
   if(t.dataset.atab){atab=t.dataset.atab;saveResume();render(false);window.scrollTo(0,0);return}
   if(t.dataset.resday){resDay=+t.dataset.resday;saveResume();render(false);return}
   var a=t.dataset.act,id=t.dataset.id;
+  if(a==="shLock"){lsSet("bc-shifts",null);render(false);return}
   if(a==="logout"){signOut(auth);DRAFT=null;go("home");return}
   if(a==="publish"){publish();return}
   if(a==="reset"){if(confirm("Alle unveröffentlichten Änderungen verwerfen?")){lsSet("bc-draft",null);DRAFT=norm(clone(STATE));render(true)}return}
@@ -457,6 +499,11 @@ app.addEventListener("click",function(e){
     DRAFT.goldTeams=DRAFT.goldTeams.filter(function(x){return x.id!==id})}
   else return;
   markDirty();render(true);
+});
+app.addEventListener("submit",function(e){
+  if(e.target.id!=="shf")return;e.preventDefault();
+  var v=document.getElementById("shpw").value.trim();
+  if(v===SHIFT_PW){lsSet("bc-shifts",SHIFT_PW);render(false)}else{document.getElementById("sherr").textContent="Das Passwort stimmt nicht."}
 });
 app.addEventListener("keydown",function(e){
   if((e.key==="Enter"||e.key===" ")&&e.target.matches("img[data-go]")){e.preventDefault();go(e.target.dataset.go)}
@@ -539,7 +586,7 @@ function newMain(old){
   var ci=info.findIndex(function(x){return /turnierkonzept/i.test(x.title||"")});if(ci>=0)info[ci].text=CONCEPT_TEXT;else info.unshift({id:"s1",title:"Turnierkonzept",text:CONCEPT_TEXT});
   return {mode:MODE,settings:s,teams:teams,menu:(old&&old.menu&&old.menu.length)?old.menu:DEFAULT_MENU,
     goldTeams:teams.map(function(t){return {id:"g"+t.id,teamId:t.id,name:""}}).concat(keepGold),
-    info:info,shuttle:clone(DEFAULT_SHUTTLE),updated:new Date().toISOString()};
+    info:info,shuttle:clone(DEFAULT_SHUTTLE),shuttleStand:SHUTTLE_STAND,updated:new Date().toISOString()};
 }
 async function seed(){
   if(STATE||!mainLoaded)return;
@@ -635,6 +682,7 @@ if(res&&Date.now()-res.t<90e3){route=res.route||"home";atab=res.atab||atab;gsel=
 if(ATABS.every(function(x){return x[0]!==atab}))atab="results";
 if(location.hash==="#orga")route="admin";
 if(location.hash==="#info")route="info";
+if(location.hash==="#schichten")route="shifts";
 if(route==="admin"||route==="info"){done0()}else welcome(done0);
 function done0(){render(false)}
 startFirebase();
