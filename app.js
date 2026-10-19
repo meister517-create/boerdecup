@@ -7,16 +7,16 @@ import {compute,startTs,defaultTeams,DEFAULT_SETTINGS,MODE,GAME_COUNT} from "./e
 var CFG=window.BC_CONFIG||{};
 var LOGO="logo.png";
 var app=document.getElementById("app");
-var SHIFT_PW="1996",shDay=1;
+var SHIFT_PW="1996",shDay=1,shQ="";
 var AREAS=[{id:"caf",name:"Cafeteria",n:2},{id:"grill",name:"Grill- und Bierstand",n:2},{id:"spk",name:"Sprecherkabine",n:1}];
 var DEFAULT_QUICK=[{id:"q1",label:"Bier",price:2.5},{id:"q2",label:"Biermeter",price:25},{id:"q3",label:"Kamu",price:3},{id:"q4",label:"Kamumeter",price:30}];
 var STATE=null, RESULTS={games:{},los:{}}, LOGOS={}, USER=null, authReady=false, DRAFT=null, route="home", filter="Alle", atab="results", gsel="", publishing=false, pendingRender=false, resDay=1;
-var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info","shuttle","shuttleStand","goldQuick","shifts"];
+var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info","shuttle","shuttleStand","goldQuick","shifts","shiftsOff"];
 
 function norm(s){
   s.settings=Object.assign({},DEFAULT_SETTINGS,s.settings||{});
   if(!Array.isArray(s.teams)||!s.teams.length||!s.teams[0].cat)s.teams=defaultTeams();
-  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];s.shuttle=s.shuttle||[];if(s.shuttleStand!==SHUTTLE_STAND){s.shuttle=clone(DEFAULT_SHUTTLE);s.shuttleStand=SHUTTLE_STAND}if(!Array.isArray(s.goldQuick))s.goldQuick=clone(DEFAULT_QUICK);if(!s.shifts||typeof s.shifts!=="object"||Array.isArray(s.shifts))s.shifts={};
+  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];s.shuttle=s.shuttle||[];if(s.shuttleStand!==SHUTTLE_STAND){s.shuttle=clone(DEFAULT_SHUTTLE);s.shuttleStand=SHUTTLE_STAND}if(!Array.isArray(s.goldQuick))s.goldQuick=clone(DEFAULT_QUICK);if(!s.shifts||typeof s.shifts!=="object"||Array.isArray(s.shifts))s.shifts={};if(!s.shiftsOff||typeof s.shiftsOff!=="object"||Array.isArray(s.shiftsOff))s.shiftsOff={};
   return s}
 
 /* ---------- storage helpers ---------- */
@@ -193,6 +193,16 @@ function shiftSlots(day){
   var l=gs[gs.length-1],a=Math.floor(gs[0].start/60),b=Math.ceil((l.start+l.dur)/60),out=[];
   for(var h=a;h<b;h++)out.push(h);return out}
 function shiftKey(day,h,area,i){return day+"-"+String(h).padStart(2,"0")+"|"+area+"|"+i}
+function areaKey(day,h,area){return day+"-"+String(h).padStart(2,"0")+"|"+area}
+function areaOff(st,day,h,area){return !!(st.shiftsOff||{})[areaKey(day,h,area)]}
+function shiftNames(st,day,h,a){var ns=[];for(var i=0;i<a.n;i++){var v=((st.shifts||{})[shiftKey(day,h,a.id,i)]||"").trim();if(v)ns.push(v)}return ns}
+function shiftResults(q){
+  var st=S(),out=[];q=q.trim().toLowerCase();if(!q)return "";
+  [1,2].forEach(function(day){shiftSlots(day).forEach(function(h){AREAS.forEach(function(a){
+    if(areaOff(st,day,h,a.id))return;var ns=shiftNames(st,day,h,a),me=ns.filter(function(n){return n.toLowerCase().indexOf(q)>=0});
+    if(!me.length)return;var mates=ns.filter(function(n){return me.indexOf(n)<0});
+    out.push('<div class="shres"><span class="shrt">'+(day===1?'Sa':'So')+' '+hh(h)+' – '+hh(h+1)+'</span><b>'+esc(a.name)+'</b><span class="shrm">'+esc(me.join(", "))+(mates.length?' · mit '+esc(mates.join(", ")):'')+'</span></div>')})})});
+  return out.length?'<p class="hint" style="margin:0 0 8px"><b>'+out.length+' Schicht'+(out.length===1?'':'en')+'</b> für „'+esc(q)+'“ an beiden Tagen</p><div class="shrlist">'+out.join("")+'</div>':'<p class="hint">Keine Schicht für „'+esc(q)+'“ gefunden.</p>'}
 function shiftsOk(){return lsGet("bc-shifts")===SHIFT_PW}
 function vShifts(){
   if(!shiftsOk())return pageHead("Schichtpläne")+'<main><div class="wrap"><form id="shf" class="card shlock"><h2 class="sec">Geschützter Bereich</h2><p class="hint">Bitte das Passwort für die Schichtpläne eingeben.</p>'+
@@ -203,13 +213,13 @@ function vShifts(){
   var chips='<div class="chips" role="group" aria-label="Tag"><button class="chip" data-shday="1" aria-pressed="'+(shDay===1)+'">Samstag</button><button class="chip" data-shday="2" aria-pressed="'+(shDay===2)+'">Sonntag</button></div>';
   var cards=slots.map(function(h){
     var isNow=today===now.toDateString()&&now.getHours()===h,all=[];
-    var rows=AREAS.map(function(a){var ns=[];for(var i=0;i<a.n;i++){var v=(sh[shiftKey(shDay,h,a.id,i)]||"").trim();if(v){ns.push(v);all.push(v)}}
+    var rows=AREAS.filter(function(a){return !areaOff(st,shDay,h,a.id)}).map(function(a){var ns=shiftNames(st,shDay,h,a);all.push.apply(all,ns);
       return '<div class="shrow"><span class="sha">'+esc(a.name)+'</span><span class="shn2'+(ns.length<a.n?' open':'')+'">'+(ns.length?ns.map(esc).join(", "):'')+(ns.length<a.n?(ns.length?' · ':'')+(a.n-ns.length)+' offen':'')+'</span></div>'}).join("");
-    return '<section class="shc'+(isNow?' now':'')+'" data-n="'+esc(all.join(" ").toLowerCase())+'"><h3>'+hh(h)+' – '+hh(h+1)+' Uhr'+(isNow?'<span class="pill lv"><i></i>Jetzt</span>':'')+'</h3>'+rows+'</section>'}).join("");
-  return pageHead("Schichtpläne")+'<main><div class="wrap">'+chips+
-    '<input class="in" id="shq" type="search" placeholder="Name suchen …" aria-label="Nach Namen suchen" style="margin:4px 0 12px">'+
-    '<p class="hint" id="shnone" style="display:none">Keine Schicht mit diesem Namen an diesem Tag.</p>'+
-    (slots.length?'<div class="shlist">'+cards+'</div>':'<div class="empty">Noch keine Schichten.</div>')+
+    return '<section class="shc'+(isNow?' now':'')+'" data-n="'+esc(all.join(" ").toLowerCase())+'"><h3>'+hh(h)+' – '+hh(h+1)+' Uhr'+(isNow?'<span class="pill lv"><i></i>Jetzt</span>':'')+'</h3>'+(rows||'<p class="hint" style="margin:4px 0 0">Keine Schicht in dieser Stunde.</p>')+'</section>'}).join("");
+  return pageHead("Schichtpläne")+'<main><div class="wrap">'+
+    '<label class="f" for="shq" style="margin-top:0">Meine Schichten</label><input class="in" id="shq" type="search" value="'+esc(shQ)+'" placeholder="Deinen Namen eingeben …" aria-label="Eigenen Namen suchen" style="margin:0 0 12px">'+
+    '<div id="shres">'+shiftResults(shQ)+'</div>'+
+    '<div id="shall"'+(shQ.trim()?' style="display:none"':'')+'>'+chips+(slots.length?'<div class="shlist">'+cards+'</div>':'<div class="empty">Noch keine Schichten.</div>')+'</div>'+
     '<p style="margin-top:22px;text-align:center"><button class="btn ghost sm" data-act="shLock">Bereich wieder sperren</button></p></div></main>'+nav()}
 
 /* ---------- admin views ---------- */
@@ -303,10 +313,12 @@ function aShifts(D){
   var slots=shiftSlots(shDay),sh=D.shifts,open=0,tot=0;
   var cards=slots.map(function(h){
     return '<div class="card"><h2 class="sec" style="margin-bottom:8px">'+hh(h)+' – '+hh(h+1)+' Uhr</h2>'+AREAS.map(function(a){
+      var ak=areaKey(shDay,h,a.id);
+      if(D.shiftsOff[ak])return '<div class="row shoff" style="margin-top:8px"><span class="grow"><b>'+esc(a.name)+'</b> – keine Schicht</span><button class="btn ghost sm" data-act="shOn" data-id="'+ak+'">Wiederherstellen</button></div>';
       var ins='';for(var i=0;i<a.n;i++){var k=shiftKey(shDay,h,a.id,i),v=sh[k]||"";tot++;if(!v.trim())open++;
         ins+='<input class="in grow" data-k="shift" data-id="'+k+'" value="'+esc(v)+'" placeholder="Name" aria-label="'+esc(a.name)+' '+hh(h)+' Person '+(i+1)+'">'}
-      return '<div style="margin-top:8px"><label class="f" style="margin:0 0 4px">'+esc(a.name)+'</label><div class="row">'+ins+'</div></div>'}).join("")+'</div>'}).join("");
-  return '<p class="hint">Schichten je volle Stunde, passend zum Spielplan des Tages. Cafeteria und Grill- und Bierstand mit je zwei Personen, Sprecherkabine mit einer. Mit „Veröffentlichen“ speichern. Im Frontend unten auf der Startseite unter „Schichtpläne“, Passwort '+SHIFT_PW+'.</p>'+
+      return '<div style="margin-top:8px"><div class="row" style="justify-content:space-between;margin-bottom:4px"><label class="f" style="margin:0">'+esc(a.name)+'</label><button class="btn icon sm" data-act="shOff" data-id="'+ak+'" aria-label="Schicht '+esc(a.name)+' '+hh(h)+' entfernen" title="Schicht entfernen">✕</button></div><div class="row">'+ins+'</div></div>'}).join("")+'</div>'}).join("");
+  return '<p class="hint">Schichten je volle Stunde, passend zum Spielplan des Tages. Cafeteria und Grill- und Bierstand mit je zwei Personen, Sprecherkabine mit einer. Ist ein Bereich in einer Stunde nicht geöffnet, die Schicht mit ✕ entfernen. Mit „Veröffentlichen“ speichern. Im Frontend unten auf der Startseite unter „Schichtpläne“, Passwort '+SHIFT_PW+'.</p>'+
     '<div class="chips" role="group" aria-label="Tag"><button class="chip" data-shday="1" aria-pressed="'+(shDay===1)+'">Samstag</button><button class="chip" data-shday="2" aria-pressed="'+(shDay===2)+'">Sonntag</button></div>'+
     '<p class="hint"><span class="badge" id="shbadge">'+(tot-open)+' von '+tot+' Plätzen belegt</span></p><div class="rows">'+cards+'</div>'}
 function aGeneral(D){
@@ -370,7 +382,7 @@ function parseNum(v){v=String(v).trim().replace(",",".");if(v==="")return null;v
 function parseScore(id){var el=document.getElementById(id);if(!el)return undefined;var v=el.value.trim();if(v==="")return null;if(!/^\d{1,2}$/.test(v))return NaN;return parseInt(v,10)}
 
 app.addEventListener("input",function(e){
-  if(e.target.id==="shq"){var q=e.target.value.trim().toLowerCase(),vis=0;document.querySelectorAll(".shc").forEach(function(c){var ok=!q||c.dataset.n.indexOf(q)>=0;c.style.display=ok?"":"none";if(ok)vis++});var nn=document.getElementById("shnone");if(nn)nn.style.display=vis?"none":"";return}
+  if(e.target.id==="shq"){shQ=e.target.value;document.getElementById("shres").innerHTML=shiftResults(shQ);document.getElementById("shall").style.display=shQ.trim()?"none":"";return}
   var el=e.target,k=el.dataset.k;if(!k||!DRAFT)return;var id=el.dataset.id,v=el.type==="checkbox"?el.checked:el.value;
   if(k==="team.name")DRAFT.teams.find(function(t){return t.id===id}).name=v;
   else if(k.indexOf("it.")===0){var c=findC(el.dataset.cid),it=c.items.find(function(i){return i.id===id}),g=k.slice(3);
@@ -457,6 +469,12 @@ app.addEventListener("click",function(e){
   if(t.dataset.atab){atab=t.dataset.atab;saveResume();render(false);window.scrollTo(0,0);return}
   if(t.dataset.resday){resDay=+t.dataset.resday;saveResume();render(false);return}
   var a=t.dataset.act,id=t.dataset.id;
+  if(a==="shOff"||a==="shOn"){var p=id.split("|"),ar=AREAS.find(function(x){return x.id===p[1]});
+    if(a==="shOff"){var has=false;for(var i=0;i<ar.n;i++){if(DRAFT.shifts[id+"|"+i])has=true}
+      if(has&&!confirm("Schicht "+ar.name+" entfernen? Die eingetragenen Namen werden gelöscht."))return;
+      for(var j=0;j<ar.n;j++)delete DRAFT.shifts[id+"|"+j];DRAFT.shiftsOff[id]=true}
+    else delete DRAFT.shiftsOff[id];
+    markDirty();render(true);return}
   if(a==="shLock"){lsSet("bc-shifts",null);render(false);return}
   if(a==="logout"){signOut(auth);DRAFT=null;go("home");return}
   if(a==="publish"){publish();return}
