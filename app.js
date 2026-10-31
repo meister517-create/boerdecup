@@ -36,7 +36,7 @@ function ed(){var n=parseInt((S().settings||{}).edition,10);return n>0?n:40}
 function isB2(){return !!STATE&&STATE.mode===MODE}
 var _C=null,_Ck="";
 function C(){var k=JSON.stringify([S().settings,S().teams,RESULTS]);if(k!==_Ck){_Ck=k;_C=compute(S().settings,S().teams,RESULTS)}return _C}
-function liveInfo(g){if(g.played)return null;var s=startTs(g);if(s===null)return null;var n=Date.now(),D=Math.max(1,g.dur)*60e3;if(n<s||n>=s+D)return null;return{min:Math.floor((n-s)/60e3)+1,p:(n-s)/D}}
+function liveInfo(g){var s=startTs(g);if(s===null)return null;var n=Date.now(),D=Math.max(1,g.dur)*60e3;if(n<s||n>=s+D)return null;return{min:Math.floor((n-s)/60e3)+1,p:(n-s)/D}}
 function liveGames(){return C().games.filter(function(g){return liveInfo(g)})}
 function nextGame(){return C().games.find(function(g){return !g.played&&!liveInfo(g)})}
 function fmtDay(d,o){if(!d)return"";var p=d.split("-");return new Date(+p[0],p[1]-1,+p[2]).toLocaleDateString("de-DE",o||{weekday:"long",day:"numeric",month:"long"})}
@@ -87,12 +87,13 @@ function tile(k,t,body,cls){return '<button class="tile '+cls+'" data-go="'+k+'"
 function vHome(){
   var c=C(),nm=nextGame(),lv=liveGames(),gr=goldTotals().filter(function(r){return r.v>0}),items=[].concat.apply([],S().menu.map(function(x){return x.items||[]}));
   var wd=function(g){return fmtDay(g.date,{weekday:'long'})+' '};
-  var plan=lv.length?'<span class="lvtag"><i></i>Live</span><span>'+liveInfo(lv[0]).min+'. Minute, '+esc(lv[0].label)+'</span><strong>'+esc(lv[0].l1)+'<span class="vs">gegen</span>'+esc(lv[0].l2)+'</strong>'
+  var plan=lv.length?'<span class="lvtag"><i></i>Live</span><span>'+liveInfo(lv[0]).min+'. Minute, '+esc(lv[0].label)+'</span><strong>'+esc(lv[0].l1)+'<span class="vs">'+(lv[0].played?lv[0].h+':'+lv[0].a:'gegen')+'</span>'+esc(lv[0].l2)+'</strong>'
     :nm?'<span>Als Nächstes '+esc(wd(nm))+'um '+esc(nm.time)+' Uhr, '+esc(nm.label)+'</span><strong>'+esc(nm.l1)+'<span class="vs">gegen</span>'+esc(nm.l2)+'</strong>'
     :'<strong>Alle Spiele sind gespielt</strong>';
   var lines=[];
-  if(c.championH)lines.push('Sieger Herren: '+esc(teamById(c.championH).name));else if((c.tabA[0]&&c.tabA[0].sp)||(c.tabB[0]&&c.tabB[0].sp))lines.push('Herren: '+esc(c.tabA[0].t.name)+' (A), '+esc(c.tabB[0].t.name)+' (B)');
-  if(c.championD)lines.push('Siegerinnen Damen: '+esc(teamById(c.championD).name));else if(c.tabD[0]&&c.tabD[0].sp)lines.push('Damen: '+esc(c.tabD[0].t.name));
+  var lvCodes=lv.map(function(g){return g.code});
+  if(c.championH&&lvCodes.indexOf("HF")<0)lines.push('Sieger Herren: '+esc(teamById(c.championH).name));else if((c.tabA[0]&&c.tabA[0].sp)||(c.tabB[0]&&c.tabB[0].sp))lines.push('Herren: '+esc(c.tabA[0].t.name)+' (A), '+esc(c.tabB[0].t.name)+' (B)');
+  if(c.championD&&lvCodes.indexOf("DF")<0)lines.push('Siegerinnen Damen: '+esc(teamById(c.championD).name));else if(c.tabD[0]&&c.tabD[0].sp)lines.push('Damen: '+esc(c.tabD[0].t.name));
   var tbl=lines.length?'<strong>'+lines[0]+'</strong>'+(lines[1]?'<span>'+lines[1]+'</span>':''):'<strong>Noch keine Ergebnisse</strong>';
   var ch=items.filter(function(i){return !i.out}).sort(function(a,b){return a.price-b.price})[0];
   var food=items.length?'<strong>'+items.length+' Angebote</strong><span>'+(ch?'ab '+eur(ch.price):'')+'</span>':'<strong>Karte folgt</strong>';
@@ -104,10 +105,11 @@ function vHome(){
 }
 function gameHTML(g,nx){
   var sc=g.played,lv=liveInfo(g),t1=teamById(g.t1),t2=teamById(g.t2);
-  var w1=g.decided&&(g.h>g.a||(g.h===g.a&&g.p1>g.p2)),w2=g.decided&&!w1;
+  // Sieger erst nach Spielende markieren, bei Unentschieden (ohne 7m-Entscheidung) niemanden
+  var fin=g.decided&&!lv,w1=fin&&(g.h>g.a||(g.h===g.a&&g.p1>g.p2)),w2=fin&&(g.a>g.h||(g.h===g.a&&g.p2>g.p1));
   var pen=(g.ko&&g.played&&g.h===g.a&&g.p1!=null&&g.p2!=null)?'<div class="small">'+g.p1+':'+g.p2+' n. 7m</div>':'';
   var mid='<div class="mid">'+(lv?'<span class="pill lv"><i></i>LIVE</span>':nx?'<span class="pill">Als Nächstes</span>':'')+'<div class="grp">'+esc(g.label)+'</div>'+
-    (lv?'<div class="min">'+lv.min+'. Min.</div><div class="prog" aria-hidden="true"><b style="--p:'+(lv.p*100).toFixed(1)+'%"></b></div><div class="small">seit '+esc(g.time)+' Uhr</div>'
+    (lv?(sc?'<div class="score">'+g.h+':'+g.a+'</div>'+pen:'')+'<div class="min">'+lv.min+'. Min.</div><div class="prog" aria-hidden="true"><b style="--p:'+(lv.p*100).toFixed(1)+'%"></b></div><div class="small">seit '+esc(g.time)+' Uhr</div>'
     :sc?'<div class="score">'+g.h+':'+g.a+'</div>'+pen+'<div class="small">'+esc(g.time)+' Uhr</div>'
        :'<div class="vs">vs.</div><div class="clock">'+esc(g.time)+'</div><div class="small">'+g.dur+' Min.</div>')+'</div>';
   function side(t,s,won){return '<div class="side">'+logo(t,56)+'<span class="nm'+(t?'':' ph-t')+(won?' won':'')+'">'+esc(s)+'</span></div>'}
@@ -236,13 +238,14 @@ function numIn(id,v,label){return '<input class="in sc" id="'+id+'" inputmode="n
 function aResults(){
   var c=C(),gs=c.games.filter(function(g){return g.day===resDay});
   var done=c.games.filter(function(g){return g.played}).length;
-  var head='<div class="card"><p class="hint" style="margin:0 0 10px">Ergebnisse werden pro Spiel mit „Speichern“ sofort veröffentlicht. Paarungen der Platzierungsspiele, Tabellen und Endstand rechnet die App automatisch. Leere Felder bedeuten: noch nicht gespielt.</p>'+
+  var head='<div class="card"><p class="hint" style="margin:0 0 10px">Ergebnisse werden pro Spiel mit „Speichern“ sofort veröffentlicht. Paarungen der Platzierungsspiele, Tabellen und Endstand rechnet die App automatisch. Leere Felder bedeuten: noch nicht gespielt. Den Zwischenstand kannst du auch während des Spiels speichern und laufend aktualisieren: Die Live-Anzeige mit Spielminute bleibt, bis das Spiel laut Uhrzeit vorbei ist.</p>'+
     '<div class="row" style="flex-wrap:wrap"><span class="badge">'+done+' von '+GAME_COUNT+' Ergebnissen</span><span class="badge'+(c.completeA?' ok':'')+'">Gruppe A '+(c.completeA?'komplett':'läuft')+'</span><span class="badge'+(c.completeB?' ok':'')+'">Gruppe B '+(c.completeB?'komplett':'läuft')+'</span><span class="badge'+(c.completeD?' ok':'')+'">Damen-Gruppe '+(c.completeD?'komplett':'läuft')+'</span></div></div>'+
     '<div class="chips" role="group" aria-label="Tag"><button class="chip" data-resday="1" aria-pressed="'+(resDay===1)+'">Samstag</button><button class="chip" data-resday="2" aria-pressed="'+(resDay===2)+'">Sonntag</button><button class="chip" data-resday="0" aria-pressed="'+(resDay===0)+'">Losentscheid</button></div>';
   if(resDay===0)return head+aLos(c);
   return head+'<div class="rows">'+gs.map(function(g){
     var stx=g.hint?'<span class="warn">'+esc(g.hint)+'</span>':(g.played?'<span class="okt">gespeichert '+g.h+':'+g.a+(g.ko&&g.h===g.a&&g.p1!=null?' ('+g.p1+':'+g.p2+' n. 7m)':'')+'</span>':'');
-    return '<div class="card rres'+(g.played?' done':'')+'"><div class="rtop"><b>Spiel '+g.nr+'</b><span>'+esc(g.time)+' Uhr, '+esc(g.label)+'</span></div>'+
+    var li=liveInfo(g);
+    return '<div class="card rres'+(g.played&&!li?' done':'')+(li?' rlive':'')+'"><div class="rtop"><b>Spiel '+g.nr+'</b>'+(li?'<span class="pill lv"><i></i>LIVE · '+li.min+'. Min.</span>':'')+'<span>'+esc(g.time)+' Uhr, '+esc(g.label)+'</span></div>'+
      '<div class="rgrid"><span class="rt">'+esc(g.l1)+'</span>'+numIn("h"+g.nr,g.h,"Tore "+g.l1)+'<span class="colon">:</span>'+numIn("a"+g.nr,g.a,"Tore "+g.l2)+'<span class="rt r">'+esc(g.l2)+'</span></div>'+
      (g.ko?'<div class="rgrid pen"><span class="rt">7m-Schießen (nur bei Unentschieden)</span>'+numIn("p"+g.nr,g.p1,"7m "+g.l1)+'<span class="colon">:</span>'+numIn("q"+g.nr,g.p2,"7m "+g.l2)+'<span></span></div>':'')+
      '<div class="row" style="margin-top:8px;justify-content:space-between">'+stx+'<span class="row"><button class="btn ghost sm" data-act="clrRes" data-nr="'+g.nr+'"'+(g.played||g.partial?'':' disabled')+'>Leeren</button><button class="btn red sm" data-act="saveRes" data-nr="'+g.nr+'">Speichern</button></span></div></div>'}).join("")+'</div>';
