@@ -32,6 +32,7 @@ function eur(n){return Number(n||0).toLocaleString("de-DE",{style:"currency",cur
 function clone(o){return JSON.parse(JSON.stringify(o))}
 function S(){return DRAFT||STATE||norm({})}
 function teamById(id){return id?S().teams.find(function(t){return t.id===id}):null}
+function ed(){var n=parseInt((S().settings||{}).edition,10);return n>0?n:40}
 function isB2(){return !!STATE&&STATE.mode===MODE}
 var _C=null,_Ck="";
 function C(){var k=JSON.stringify([S().settings,S().teams,RESULTS]);if(k!==_Ck){_Ck=k;_C=compute(S().settings,S().teams,RESULTS)}return _C}
@@ -80,7 +81,7 @@ function hero(){
   var st=S().settings,meta=[st.date||fmtDay(st.day1,{day:"numeric",month:"long",year:"numeric"}),st.place].filter(Boolean).map(esc).join(", ");
   return '<header class="hero">'+PITCH+'<div class="wrap"><div class="hero-top"><img src="'+LOGO+'" alt="Logo Soester Hockey-Club"><div class="club">Soester Hockey-Club e.V.<br>seit 1996</div>'+
    '<button class="info-btn" data-go="info" aria-label="Infos zum Turnier">i</button></div>'+
-   '<div class="hero-num"><span class="n" aria-hidden="true">40</span><span class="lbl">Auflage<br>des Turniers</span></div><h1>Soester Börde-Cup</h1>'+(meta?'<p class="meta">'+meta+'</p>':'')+'</div></header>';
+   '<div class="hero-num"><span class="n" aria-hidden="true">'+ed()+'</span><span class="lbl">Auflage<br>des Turniers</span></div><h1>Soester Börde-Cup</h1>'+(meta?'<p class="meta">'+meta+'</p>':'')+'</div></header>';
 }
 function tile(k,t,body,cls){return '<button class="tile '+cls+'" data-go="'+k+'"><div class="t-head"><h2>'+t+'</h2>'+ICON[k]+'</div><div class="t-body">'+body+'</div></button>'}
 function vHome(){
@@ -99,7 +100,7 @@ function vHome(){
   var teams='<div class="lgs">'+tm.slice(0,6).map(function(t){return logo(t)}).join("")+'</div><strong>'+tm.length+' Teams</strong>';
   var gold=gr.length?'<strong>'+esc(gtName(gr[0].g))+'</strong><span>liegt an der Theke vorn</span>':'<strong>Wer holt das Gold?</strong><span>Die Theke ist eröffnet</span>';
   return hero()+'<main><div class="wrap"><div class="tiles">'+tile("plan","Spielplan",plan,"big")+tile("table","Tabelle",tbl,"")+tile("food","Essen & Getränke",food,"")+tile("teams","Teams",teams,"")+tile("gold","Thekengold",gold,"gold")+
-   '</div><p class="foot">40. Soester Börde-Cup des Soester Hockey-Club e.V.<br><button data-go="admin">Orga-Bereich</button><br><button data-go="shifts">Schichtpläne</button></p></div></main>'+nav();
+   '</div><p class="foot">'+ed()+'. Soester Börde-Cup des Soester Hockey-Club e.V.<br><button data-go="admin">Orga-Bereich</button><br><button data-go="shifts">Schichtpläne</button></p></div></main>'+nav();
 }
 function gameHTML(g,nx){
   var sc=g.played,lv=liveInfo(g),t1=teamById(g.t1),t2=teamById(g.t2);
@@ -324,12 +325,17 @@ function aShifts(D){
 function aGeneral(D){
   var s=D.settings,c=compute(s,D.teams,RESULTS),g=c.games;
   function f(k,lab,type,extra){return '<div><label class="f" for="s-'+k+'">'+lab+'</label><input class="in" id="s-'+k+'" type="'+type+'" data-k="set.'+k+'" value="'+esc(s[k])+'"'+(extra||'')+'></div>'}
-  return '<div class="card"><h2 class="sec">Turniertage und Uhrzeiten</h2><p class="hint">Aus diesen Angaben berechnet die App alle Anstoßzeiten und die Live-Anzeige.</p>'+
+  return '<div class="card"><h2 class="sec">Auflage</h2><p class="hint">Die große Zahl auf der Startseite („Auflage des Turniers“) und im Seitentitel. Für nächstes Jahr einfach hochzählen.</p>'+f("edition","Auflage (Nummer)","number",' min="1" inputmode="numeric"')+'<p class="hint" style="margin:8px 0 0">Vorschau: <b>'+ed()+'. Soester Börde-Cup</b></p></div>'+
+   '<div class="card"><h2 class="sec">Turniertage und Uhrzeiten</h2><p class="hint">Aus diesen Angaben berechnet die App alle Anstoßzeiten und die Live-Anzeige.</p>'+
    '<div class="mgrid" style="grid-template-columns:1fr 1fr">'+f("day1","Samstag (Datum)","date")+f("start1","Beginn Samstag","time")+f("day2","Sonntag (Datum)","date")+f("start2","Beginn Sonntag","time")+'</div></div>'+
    '<div class="card"><h2 class="sec">Spielzeiten</h2><div class="mgrid" style="grid-template-columns:1fr 1fr">'+f("durG","Spielzeit Gruppenspiele","number",' min="1"')+f("chgG","Wechselzeit","number",' min="0"')+f("durK","Spielzeit Platzierungsspiele","number",' min="1"')+f("chgK","Wechselzeit Platzierungsspiele","number",' min="0"')+'</div>'+
    '<p class="hint" style="margin:12px 0 0">Ende Samstag: '+fmtEnd(lastOf(g,1))+' Uhr. Sonntag: Platzierungsspiele ab '+g.filter(function(x){return x.ko})[0].time+' Uhr, Ende '+fmtEnd(lastOf(g,2))+' Uhr.</p></div>'+
    '<div class="card">'+f("refFirst","Schiedsrichter im ersten Spiel des Tages","text")+f("date","Datum als Text auf der Startseite","text",' placeholder="z. B. 24. und 25. Oktober 2026"')+f("place","Ort","text")+'</div>'+
-   '<p class="hint">Veröffentlichte Änderungen erscheinen bei allen Besuchern sofort, ohne Neuladen.</p>';
+   '<p class="hint">Veröffentlichte Änderungen erscheinen bei allen Besuchern sofort, ohne Neuladen.</p>'+
+   '<div class="card dz"><h2 class="sec">Neues Turnierjahr vorbereiten</h2><p class="hint">Setzt Ergebnisse und Thekengold auf null, damit das Turnier für das kommende Jahr bereitsteht. Teams, Logos, Getränkekarte, Infos, Schichtpläne und Einstellungen bleiben erhalten. Das Löschen ist sofort live und lässt sich nicht rückgängig machen – vorher am besten eine Sicherung herunterladen.</p>'+
+   '<div class="rows"><button class="btn ghost" data-act="backup">Sicherung herunterladen (Ergebnisse und Thekengold)</button>'+
+   '<button class="btn red" data-act="resetResults">Alle Ergebnisse löschen ('+Object.keys(RESULTS.games||{}).length+' Spiele)</button>'+
+   '<button class="btn red" data-act="resetGold">Thekengold zurücksetzen ('+(S().goldLog||[]).length+' Buchungen)</button></div></div>';
 }
 function lastOf(gs,d){return gs.filter(function(x){return x.day===d}).slice(-1)[0]}
 function fmtEnd(g){var m=g.start+g.dur;return String(Math.floor(m/60)%24).padStart(2,"0")+":"+String(m%60).padStart(2,"0")}
@@ -351,7 +357,7 @@ function vAdmin(){
 
 /* ---------- render ---------- */
 function render(keep){
-  var y=window.scrollY;
+  var y=window.scrollY;document.title=ed()+". Soester Börde-Cup";
   if(route==="admin"){
     if(fbError){app.innerHTML=vWaiting();return}
     if(!authReady){app.innerHTML='<main><div class="login"><p>Lädt …</p></div></main>';return}
@@ -395,7 +401,7 @@ app.addEventListener("input",function(e){
   else if(k==="gq.label")DRAFT.goldQuick.find(function(q){return q.id===id}).label=v;
   else if(k==="gq.price"){var gp=parseNum(v);DRAFT.goldQuick.find(function(q){return q.id===id}).price=gp===null?0:gp}
   else if(k.indexOf("sh.")===0)DRAFT.shuttle.find(function(r){return r.id===id})[k.slice(3)]=v;
-  else if(k.indexOf("set.")===0){var f=k.slice(4);DRAFT.settings[f]=["durG","chgG","durK","chgK"].indexOf(f)>=0?Math.max(0,parseInt(v,10)||0):v}
+  else if(k.indexOf("set.")===0){var f=k.slice(4);DRAFT.settings[f]=["durG","chgG","durK","chgK","edition"].indexOf(f)>=0?Math.max(0,parseInt(v,10)||0):v}
   markDirty();
 });
 
@@ -419,6 +425,11 @@ app.addEventListener("change",async function(e){
 
 /* ---------- speichern ---------- */
 function writeErr(err){console.error(err);toast(err&&err.code==="permission-denied"?"Keine Berechtigung. Bitte neu anmelden.":"Speichern fehlgeschlagen. Internetverbindung prüfen.")}
+function askSure(what){var v=prompt(what+"\n\nZum Bestätigen bitte LÖSCHEN eintippen:");return v!==null&&v.trim().toUpperCase()==="LÖSCHEN"}
+function backup(){
+  var data={exportiert:new Date().toISOString(),auflage:ed(),ergebnisse:RESULTS,thekengold:{teams:(STATE&&STATE.goldTeams)||[],buchungen:(STATE&&STATE.goldLog)||[]}};
+  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+  a.download="boerdecup-"+ed()+"-sicherung.json";document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);toast("Sicherung heruntergeladen")}
 async function publish(){
   if(publishing||!DRAFT)return;publishing=true;markDirty();
   var data=clone(pick(DRAFT));data.updated=new Date().toISOString();
@@ -475,6 +486,11 @@ app.addEventListener("click",function(e){
       for(var j=0;j<ar.n;j++)delete DRAFT.shifts[id+"|"+j];DRAFT.shiftsOff[id]=true}
     else delete DRAFT.shiftsOff[id];
     markDirty();render(true);return}
+  if(a==="backup"){backup();return}
+  if(a==="resetResults"){if(!askSure("Alle Ergebnisse und Losentscheide löschen? Spielplan, Tabellen und Endstand starten wieder bei null."))return;
+    setDoc(refs.results,{games:{},los:{},updated:new Date().toISOString()}).then(function(){toast("Alle Ergebnisse gelöscht")}).catch(writeErr);return}
+  if(a==="resetGold"){if(!askSure("Alle Thekengold-Buchungen löschen? Die Teams im Thekengold bleiben erhalten."))return;
+    setDoc(refs.gold,{log:[],updated:new Date().toISOString()}).then(function(){toast("Thekengold zurückgesetzt")}).catch(writeErr);return}
   if(a==="shLock"){lsSet("bc-shifts",null);render(false);return}
   if(a==="logout"){signOut(auth);DRAFT=null;go("home");return}
   if(a==="publish"){publish();return}
@@ -529,36 +545,6 @@ app.addEventListener("keydown",function(e){
   if(e.key==="Enter"&&e.target.classList.contains("sc")){var card=e.target.closest(".rres");if(card){var b=card.querySelector('[data-act="saveRes"]');if(b)b.click()}}
 });
 
-/* ---------- welcome ---------- */
-function welcome(done){
-  // Intro bei jedem Öffnen der Seite (nicht im Orga-Bereich und nicht auf der Infoseite)
-  var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var w=document.createElement("div");w.id="welcome";w.setAttribute("role","dialog");w.setAttribute("aria-label","Willkommen zum 40. Soester Börde-Cup");
-  w.innerHTML='<canvas></canvas><div class="w-inner"><img class="w-logo" src="'+LOGO+'" alt="Logo Soester Hockey-Club"><p class="w-num">40.</p><p class="w-title">Soester Börde-Cup</p><p class="w-sub">Schön, dass ihr da seid</p></div>';
-  document.body.appendChild(w);done();
-  var fin=false;function close(){if(fin)return;fin=true;w.classList.add("out");setTimeout(function(){w.remove()},650)}
-  w.addEventListener("click",close);
-  var cv=w.querySelector("canvas"),ctx=cv.getContext("2d"),dpr=Math.min(2,window.devicePixelRatio||1);
-  var vw=Math.max(innerWidth||0,document.documentElement.clientWidth||0,320),vh=Math.max(innerHeight||0,document.documentElement.clientHeight||0,480);
-  cv.width=vw*dpr;cv.height=vh*dpr;
-  var cols=["#FFFFFF","#000000","#F4D27A","#1C4E9E","#FFFFFF"],P=[];
-  if(reduce){
-    // "Bewegung reduzieren" ist am Gerät aktiv: Konfetti ohne Bewegung, damit es trotzdem festlich aussieht
-    for(var i=0;i<140;i++){ctx.save();ctx.translate(Math.random()*cv.width,Math.random()*cv.height);ctx.rotate(Math.random()*6.3);ctx.fillStyle=cols[i%cols.length];
-      if(Math.random()<.25){ctx.beginPath();ctx.arc(0,0,(3+Math.random()*3)*dpr,0,6.3);ctx.fill()}else ctx.fillRect(-5*dpr,-2.5*dpr,(7+Math.random()*6)*dpr,(3+Math.random()*4)*dpr);ctx.restore()}
-    setTimeout(close,2600);return}
-  function burst(x,y,n,dir){for(var i=0;i<n;i++){var a=dir+(Math.random()-.5)*1.1,s=(9+Math.random()*13)*dpr;
-    P.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,w:(6+Math.random()*7)*dpr,h:(3+Math.random()*5)*dpr,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:cols[i%cols.length],round:Math.random()<.25})}}
-  var t0=performance.now();
-  setTimeout(function(){burst(0,cv.height*.75,90,-Math.PI/3);burst(cv.width,cv.height*.75,90,-Math.PI*2/3)},650);
-  setTimeout(function(){burst(cv.width/2,cv.height*.38,70,-Math.PI/2)},1050);
-  (function tick(now){if(fin&&now-t0>4500)return;ctx.clearRect(0,0,cv.width,cv.height);
-    P.forEach(function(p){p.vy+=.38*dpr;p.vx*=.985;p.vy*=.985;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;
-      if(p.round){ctx.beginPath();ctx.arc(0,0,p.h*.8,0,6.3);ctx.fill()}else{var k=Math.abs(Math.cos(p.r*2));ctx.fillRect(-p.w/2,-p.h/2*k,p.w,p.h*k+1)}ctx.restore()});
-    P=P.filter(function(p){return p.y<cv.height+40});requestAnimationFrame(tick)})(t0);
-  setTimeout(close,3300);
-}
-
 /* ---------- setup & firebase ---------- */
 function vWaiting(){
   var msg,btn='<p style="margin-top:18px"><button class="btn ghost sm" data-go="admin">Zum Orga-Bereich</button></p>';
@@ -567,7 +553,7 @@ function vWaiting(){
   else if(mainLoaded&&STATE&&!isB2())msg='Der Spielplan wird gerade auf den neuen Turniermodus umgestellt. Bitte schau gleich noch einmal vorbei.';
   else if(slowLoad)msg='Die Verbindung zur Datenbank dauert ungewöhnlich lange. Prüfe in Firebase, ob die Firestore-Datenbank angelegt ist und die Werte in config.js stimmen.';
   else{msg='Die Seite wird geladen …';btn=''}
-  return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>40. Soester Börde-Cup</h1><p>'+msg+'</p>'+btn+'</div></main>'}
+  return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>'+ed()+'. Soester Börde-Cup</h1><p>'+msg+'</p>'+btn+'</div></main>'}
 function vSetup(){return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>Ersteinrichtung</h1><p>Die Datenbank ist noch leer. Lege die Startdaten an: 8 Herren- und 6 Damen-Teams, den Spielplan für beide Tage, eine Beispielkarte und Infotexte.</p><button class="btn red" style="width:100%" data-act="seed">Startdaten anlegen</button><p style="margin-top:14px"><button class="btn ghost sm" data-act="logout">Abmelden</button></p></div></main>'}
 var DEFAULT_MENU=[{"id":"c1","name":"Getränke","items":[{"id":"i1","name":"Bier 0,3 l","price":2.5,"note":"","out":false},{"id":"i2","name":"Radler 0,3 l","price":2.5,"note":"","out":false},{"id":"i3","name":"Softdrinks 0,3 l","price":2,"note":"Cola, Fanta, Sprite","out":false},{"id":"i4","name":"Wasser 0,5 l","price":1.5,"note":"","out":false},{"id":"i5","name":"Kaffee","price":1.5,"note":"","out":false}]},{"id":"c2","name":"Essen","items":[{"id":"i6","name":"Bratwurst im Brötchen","price":3.5,"note":"","out":false},{"id":"i7","name":"Pommes","price":3,"note":"Mayo oder Ketchup","out":false},{"id":"i8","name":"Kuchen","price":2,"note":"selbst gebacken","out":false}]}];
 var CONCEPT_TEXT="Damen (6 Teams)\nJede gegen jede, also 5 Gruppenspiele pro Team (12 Spiele am Samstag, 3 am Sonntagmorgen). Danach Halbfinale (1. gegen 4., 2. gegen 3.), Spiel um Platz 5 (5. gegen 6.), Spiel um Platz 3 und Finale.\n\nHerren (8 Teams)\nZwei Gruppen mit je 4 Teams, jede gegen jede, also 3 Gruppenspiele pro Team, alle am Samstag. Am Sonntag: Halbfinale 1. A gegen 2. B und 1. B gegen 2. A, Überkreuzspiele 3. A gegen 4. B und 3. B gegen 4. A. Danach Spiele um Platz 7, 5 und 3 und das Finale, es werden alle Plätze ausgespielt.\n\nSpielzeiten\nGruppenspiele: 20 Minuten Spielzeit, 5 Minuten Wechsel. Platzierungsspiele am Sonntag: 17 Minuten Spielzeit, 5 Minuten Wechsel. Samstag von 9:00 bis ca. 18:55 Uhr, Sonntag von 9:00 bis ca. 15:00 Uhr.\n\nWertung\nSieg 3 Punkte, Unentschieden 1 Punkt. Bei Punktgleichheit entscheiden Tordifferenz, dann mehr erzielte Tore, zuletzt das Los. Platzierungsspiele werden bei Unentschieden im 7m-Schießen entschieden.\n\nSchiedsrichter\nDas erste Spiel am Samstag und am Sonntag pfeifen zwei Schiedsrichter aus Soest, danach pfeifen immer die beiden Teams aus dem vorherigen Spiel. Bitte bleibt nach eurem Spiel direkt am Platz.";
@@ -693,7 +679,7 @@ function restFallback(c){
   setTimeout(function(){if(!liveOK){load();restTimer=setInterval(load,15000)}},5000);
 }
 /* ---------- start ---------- */
-setInterval(function(){if((route==="plan"||route==="home")&&!document.querySelector("#welcome"))render(true)},20000);
+setInterval(function(){if(route==="plan"||route==="home")render(true)},20000);
 window.addEventListener("pagehide",saveResume);window.addEventListener("beforeunload",saveResume);
 var res=lsGet("bc-resume");
 if(res&&Date.now()-res.t<90e3){route=res.route||"home";atab=res.atab||atab;gsel=res.gsel||"";filter=res.filter||"Alle";if(typeof res.resDay==="number")resDay=res.resDay}
@@ -701,6 +687,6 @@ if(ATABS.every(function(x){return x[0]!==atab}))atab="results";
 if(location.hash==="#orga")route="admin";
 if(location.hash==="#info")route="info";
 if(location.hash==="#schichten")route="shifts";
-if(route==="admin"||route==="info"){done0()}else welcome(done0);
+done0();
 function done0(){render(false)}
 startFirebase();
