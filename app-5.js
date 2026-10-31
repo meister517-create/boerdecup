@@ -2,18 +2,21 @@
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {initializeFirestore,doc,onSnapshot,setDoc,updateDoc,arrayUnion,arrayRemove,deleteField} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {compute,startTs,defaultTeams,DEFAULT_SETTINGS,MODE,GAME_COUNT} from "./engine.js?v=20261013";
+import {compute,startTs,defaultTeams,DEFAULT_SETTINGS,MODE,GAME_COUNT} from "./engine.js?v=20261013c";
 
 var CFG=window.BC_CONFIG||{};
 var LOGO="logo.png";
 var app=document.getElementById("app");
+var SHIFT_PW="1996",shDay=1,shQ="";
+var AREAS=[{id:"caf",name:"Cafeteria",n:2},{id:"grill",name:"Grill- und Bierstand",n:2},{id:"spk",name:"Sprecherkabine",n:1}];
+var DEFAULT_QUICK=[{id:"q1",label:"Bier",price:2.5},{id:"q2",label:"Biermeter",price:25},{id:"q3",label:"Kamu",price:3},{id:"q4",label:"Kamumeter",price:30}];
 var STATE=null, RESULTS={games:{},los:{}}, LOGOS={}, USER=null, authReady=false, DRAFT=null, route="home", filter="Alle", atab="results", gsel="", publishing=false, pendingRender=false, resDay=1;
-var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info","shuttle"];
+var MAIN_FIELDS=["mode","settings","teams","menu","goldTeams","info","shuttle","shuttleStand","goldQuick","shifts","shiftsOff"];
 
 function norm(s){
   s.settings=Object.assign({},DEFAULT_SETTINGS,s.settings||{});
   if(!Array.isArray(s.teams)||!s.teams.length||!s.teams[0].cat)s.teams=defaultTeams();
-  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];s.shuttle=s.shuttle||[];
+  s.menu=s.menu||[];s.goldTeams=s.goldTeams||[];s.goldLog=s.goldLog||[];s.info=s.info||[];s.shuttle=s.shuttle||[];if(s.shuttleStand!==SHUTTLE_STAND){s.shuttle=clone(DEFAULT_SHUTTLE);s.shuttleStand=SHUTTLE_STAND}if(!Array.isArray(s.goldQuick))s.goldQuick=clone(DEFAULT_QUICK);if(!s.shifts||typeof s.shifts!=="object"||Array.isArray(s.shifts))s.shifts={};if(!s.shiftsOff||typeof s.shiftsOff!=="object"||Array.isArray(s.shiftsOff))s.shiftsOff={};
   return s}
 
 /* ---------- storage helpers ---------- */
@@ -29,6 +32,7 @@ function eur(n){return Number(n||0).toLocaleString("de-DE",{style:"currency",cur
 function clone(o){return JSON.parse(JSON.stringify(o))}
 function S(){return DRAFT||STATE||norm({})}
 function teamById(id){return id?S().teams.find(function(t){return t.id===id}):null}
+function ed(){var n=parseInt((S().settings||{}).edition,10);return n>0?n:40}
 function isB2(){return !!STATE&&STATE.mode===MODE}
 var _C=null,_Ck="";
 function C(){var k=JSON.stringify([S().settings,S().teams,RESULTS]);if(k!==_Ck){_Ck=k;_C=compute(S().settings,S().teams,RESULTS)}return _C}
@@ -63,7 +67,7 @@ var ICON={
 var NAV=[["home","Start"],["plan","Spielplan"],["teams","Teams"],["table","Tabelle"],["food","Essen"],["gold","Thekengold"]];
 function nav(){return '<nav class="bn" aria-label="Hauptnavigation"><div class="wrap">'+NAV.map(function(p){
   return '<button data-go="'+p[0]+'"'+(route===p[0]?' aria-current="page"':'')+'>'+ICON[p[0]]+'<span>'+p[1]+'</span></button>'}).join("")+'</div></nav>'}
-function pageHead(t){return '<div class="ph"><div class="wrap"><img src="'+LOGO+'" alt="Zur Startseite" role="button" tabindex="0" data-go="home"><h1>'+t+'</h1></div></div>'}
+function pageHead(t,back){return '<div class="ph"><div class="wrap"><img src="'+LOGO+'" alt="Zur Startseite" role="button" tabindex="0" data-go="home"><h1>'+t+'</h1>'+(back?'<button class="phback" data-go="home" aria-label="Zurück zur Startseite">'+ICON.back+'</button>':'')+'</div></div>'}
 
 function goldTotals(){
   var tot={};S().goldTeams.forEach(function(g){tot[g.id]=0});
@@ -77,7 +81,7 @@ function hero(){
   var st=S().settings,meta=[st.date||fmtDay(st.day1,{day:"numeric",month:"long",year:"numeric"}),st.place].filter(Boolean).map(esc).join(", ");
   return '<header class="hero">'+PITCH+'<div class="wrap"><div class="hero-top"><img src="'+LOGO+'" alt="Logo Soester Hockey-Club"><div class="club">Soester Hockey-Club e.V.<br>seit 1996</div>'+
    '<button class="info-btn" data-go="info" aria-label="Infos zum Turnier">i</button></div>'+
-   '<div class="hero-num"><span class="n" aria-hidden="true">40</span><span class="lbl">Auflage<br>des Turniers</span></div><h1>Soester Börde-Cup</h1>'+(meta?'<p class="meta">'+meta+'</p>':'')+'</div></header>';
+   '<div class="hero-num"><span class="n" aria-hidden="true">'+ed()+'</span><span class="lbl">Auflage<br>des Turniers</span></div><h1>Soester Börde-Cup</h1>'+(meta?'<p class="meta">'+meta+'</p>':'')+'</div></header>';
 }
 function tile(k,t,body,cls){return '<button class="tile '+cls+'" data-go="'+k+'"><div class="t-head"><h2>'+t+'</h2>'+ICON[k]+'</div><div class="t-body">'+body+'</div></button>'}
 function vHome(){
@@ -96,7 +100,7 @@ function vHome(){
   var teams='<div class="lgs">'+tm.slice(0,6).map(function(t){return logo(t)}).join("")+'</div><strong>'+tm.length+' Teams</strong>';
   var gold=gr.length?'<strong>'+esc(gtName(gr[0].g))+'</strong><span>liegt an der Theke vorn</span>':'<strong>Wer holt das Gold?</strong><span>Die Theke ist eröffnet</span>';
   return hero()+'<main><div class="wrap"><div class="tiles">'+tile("plan","Spielplan",plan,"big")+tile("table","Tabelle",tbl,"")+tile("food","Essen & Getränke",food,"")+tile("teams","Teams",teams,"")+tile("gold","Thekengold",gold,"gold")+
-   '</div><p class="foot">40. Soester Börde-Cup des Soester Hockey-Club e.V.<br><button data-go="admin">Orga-Bereich</button></p></div></main>'+nav();
+   '</div><p class="foot">'+ed()+'. Soester Börde-Cup des Soester Hockey-Club e.V.<br><button data-go="admin">Orga-Bereich</button><br><button data-go="shifts">Schichtpläne</button></p></div></main>'+nav();
 }
 function gameHTML(g,nx){
   var sc=g.played,lv=liveInfo(g),t1=teamById(g.t1),t2=teamById(g.t2);
@@ -157,11 +161,12 @@ function vFood(){
   return pageHead("Essen & Getränke")+'<main><div class="wrap">'+body+'</div></main>'+nav();
 }
 function vGold(){
-  var r=goldTotals(),max=r.length?r[0].v:0,up=S().goldUpdated?new Date(S().goldUpdated):null;
+  var r=goldTotals(),max=r.length?r[0].v:0,lg=S().goldLog||[],up=lg.length?new Date(Math.max.apply(null,lg.map(function(e){return +e.ts||0}))):null;
+  var upTxt=up?(up.toDateString()===new Date().toDateString()?'heute, ':'am '+up.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})+', ')+up.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+' Uhr':'';
   var body=r.length?'<div class="glist">'+r.map(function(x,i){var w=max>0?Math.max(x.v>0?6:0,x.v/max*100):0;
     return '<div class="gbar r'+(i+1)+'"><span class="rk">'+(i+1)+'</span><div class="hd">'+logo(gtLogoObj(x.g),30)+'<b>'+esc(gtName(x.g))+'</b></div><div class="trk"><div class="fl" style="--w:'+w.toFixed(1)+'%"></div></div></div>'}).join("")+'</div>'
    :'<div class="empty">Noch ist kein Team im Rennen. Die Theke wartet.</div>';
-  return pageHead("Thekengold")+'<main><div class="wrap"><p class="livestat"><i></i>Live-Stand'+(up?', aktualisiert '+up.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+' Uhr':'')+'</p>'+body+'</div></main>'+nav();
+  return pageHead("Thekengold")+'<main><div class="wrap"><p class="livestat"><i></i>Live-Stand'+(upTxt?' · letzte Buchung '+upTxt:'')+'</p>'+body+'</div></main>'+nav();
 }
 function richText(t){
   return String(t||"").trim().split(/\n\s*\n/).map(function(p){
@@ -171,8 +176,8 @@ function richText(t){
     return '<p>'+lead+h+'</p>'}).join("")}
 function shuttleHTML(){
   var L=S().shuttle.filter(function(r){return (r.team||"").trim()});if(!L.length)return "";
-  return '<div class="shl"><h3>Abholzeiten Samstag</h3><p class="shn">Bitte seid ein paar Minuten vor der Abfahrt am Abholort. Teams mit zwei Zeiten teilen sich selbst auf beide Fahrten auf.</p>'+
-    L.map(function(r){return '<div class="shr"><b>'+esc(r.team)+'</b><span class="shp">'+esc(r.place)+'</span><span class="sht">'+esc(r.time)+'</span></div>'}).join("")+'</div>'}
+  return '<div class="shl"><h3>Abholzeiten Samstag</h3><p class="shn">Taxi 1 und Taxi 2 fahren ab Hotel am Wall, Taxi 3 ab City Motel und Hanse-Hotel. Bitte seid ein paar Minuten vor der Abfahrt am Abholort. Teams mit mehreren Fahrten teilen sich selbst auf.</p>'+
+    L.map(function(r){return '<div class="shr"><b>'+esc(r.team)+'</b><span class="shp">'+esc(r.place)+'</span>'+String(r.time||"").split(/\s*·\s*/).map(function(x){return '<span class="sht">'+esc(x)+'</span>'}).join("")+'</div>'}).join("")+'</div>'}
 function vInfo(){
   var secs=S().info.filter(function(s){return (s.title||"").trim()||(s.text||"").trim()});
   var shIx=secs.findIndex(function(s){return /shuttle/i.test(s.title||"")}),sh=shuttleHTML();
@@ -182,6 +187,42 @@ function vInfo(){
     '<p style="margin-top:28px;text-align:center"><button class="btn ghost" data-go="home">Zurück zur Startseite</button></p></div></main>';
 }
 
+/* ---------- Schichtpläne ---------- */
+function hh(h){return String(h).padStart(2,"0")+":00"}
+function shiftSlots(day){
+  var gs=C().games.filter(function(g){return g.day===day});if(!gs.length)return [];
+  var l=gs[gs.length-1],a=Math.floor(gs[0].start/60),b=Math.ceil((l.start+l.dur)/60),out=[];
+  for(var h=a;h<b;h++)out.push(h);return out}
+function shiftKey(day,h,area,i){return day+"-"+String(h).padStart(2,"0")+"|"+area+"|"+i}
+function areaKey(day,h,area){return day+"-"+String(h).padStart(2,"0")+"|"+area}
+function areaOff(st,day,h,area){return !!(st.shiftsOff||{})[areaKey(day,h,area)]}
+function shiftNames(st,day,h,a){var ns=[];for(var i=0;i<a.n;i++){var v=((st.shifts||{})[shiftKey(day,h,a.id,i)]||"").trim();if(v)ns.push(v)}return ns}
+function shiftResults(q){
+  var st=S(),out=[];q=q.trim().toLowerCase();if(!q)return "";
+  [1,2].forEach(function(day){shiftSlots(day).forEach(function(h){AREAS.forEach(function(a){
+    if(areaOff(st,day,h,a.id))return;var ns=shiftNames(st,day,h,a),me=ns.filter(function(n){return n.toLowerCase().indexOf(q)>=0});
+    if(!me.length)return;var mates=ns.filter(function(n){return me.indexOf(n)<0});
+    out.push('<div class="shres"><span class="shrt">'+(day===1?'Sa':'So')+' '+hh(h)+' – '+hh(h+1)+'</span><b>'+esc(a.name)+'</b><span class="shrm">'+esc(me.join(", "))+(mates.length?' · mit '+esc(mates.join(", ")):'')+'</span></div>')})})});
+  return out.length?'<p class="hint" style="margin:0 0 8px"><b>'+out.length+' Schicht'+(out.length===1?'':'en')+'</b> für „'+esc(q)+'“ an beiden Tagen</p><div class="shrlist">'+out.join("")+'</div>':'<p class="hint">Keine Schicht für „'+esc(q)+'“ gefunden.</p>'}
+function shiftsOk(){return lsGet("bc-shifts")===SHIFT_PW}
+function vShifts(){
+  if(!shiftsOk())return pageHead("Schichtpläne",true)+'<main><div class="wrap"><form id="shf" class="card shlock"><h2 class="sec">Geschützter Bereich</h2><p class="hint">Bitte das Passwort für die Schichtpläne eingeben.</p>'+
+    '<label class="f" for="shpw">Passwort</label><input class="in" id="shpw" type="password" inputmode="numeric" autocomplete="off" required>'+
+    '<button class="btn red" type="submit" style="width:100%;margin-top:14px">Öffnen</button><div class="err" id="sherr" role="alert"></div></form></div></main>'+nav();
+  var st=S(),c=C(),sh=st.shifts||{},slots=shiftSlots(shDay),date=c.games.filter(function(g){return g.day===shDay})[0];
+  var now=new Date(),today=date&&date.date?(function(p){return new Date(+p[0],p[1]-1,+p[2]).toDateString()})(date.date.split("-")):"";
+  var chips='<div class="chips" role="group" aria-label="Tag"><button class="chip" data-shday="1" aria-pressed="'+(shDay===1)+'">Samstag</button><button class="chip" data-shday="2" aria-pressed="'+(shDay===2)+'">Sonntag</button></div>';
+  var cards=slots.map(function(h){
+    var isNow=today===now.toDateString()&&now.getHours()===h,all=[];
+    var rows=AREAS.filter(function(a){return !areaOff(st,shDay,h,a.id)}).map(function(a){var ns=shiftNames(st,shDay,h,a);all.push.apply(all,ns);
+      return '<div class="shrow"><span class="sha">'+esc(a.name)+'</span><span class="shn2'+(ns.length<a.n?' open':'')+'">'+(ns.length?ns.map(esc).join(", "):'')+(ns.length<a.n?(ns.length?' · ':'')+(a.n-ns.length)+' offen':'')+'</span></div>'}).join("");
+    return '<section class="shc'+(isNow?' now':'')+'" data-n="'+esc(all.join(" ").toLowerCase())+'"><h3>'+hh(h)+' – '+hh(h+1)+' Uhr'+(isNow?'<span class="pill lv"><i></i>Jetzt</span>':'')+'</h3>'+(rows||'<p class="hint" style="margin:4px 0 0">Keine Schicht in dieser Stunde.</p>')+'</section>'}).join("");
+  return pageHead("Schichtpläne",true)+'<main><div class="wrap">'+
+    '<label class="f" for="shq" style="margin-top:0">Meine Schichten</label><input class="in" id="shq" type="search" value="'+esc(shQ)+'" placeholder="Deinen Namen eingeben …" aria-label="Eigenen Namen suchen" style="margin:0 0 12px">'+
+    '<div id="shres">'+shiftResults(shQ)+'</div>'+
+    '<div id="shall"'+(shQ.trim()?' style="display:none"':'')+'>'+chips+(slots.length?'<div class="shlist">'+cards+'</div>':'<div class="empty">Noch keine Schichten.</div>')+'</div>'+
+    '<p style="margin-top:22px;text-align:center"><button class="btn ghost sm" data-act="shLock">Bereich wieder sperren</button></p></div></main>'+nav()}
+
 /* ---------- admin views ---------- */
 function vLogin(){
   return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>Orga-Bereich</h1><p>Anmelden, um den Börde-Cup zu pflegen.</p>'+
@@ -190,7 +231,7 @@ function vLogin(){
   '<button class="btn red" style="width:100%;margin-top:18px" type="submit">Anmelden</button><div class="err" id="lerr" role="alert"></div></form>'+
   '<p style="margin-top:18px"><button class="btn ghost sm" data-go="home">Zur Startseite</button></p></div></main>';
 }
-var ATABS=[["results","Ergebnisse"],["gold","Thekengold"],["teams","Teams"],["info","Infos"],["food","Essen & Getränke"],["general","Allgemein"]];
+var ATABS=[["results","Ergebnisse"],["gold","Thekengold"],["teams","Teams"],["info","Infos"],["shifts","Schichten"],["food","Essen & Getränke"],["general","Allgemein"]];
 function numIn(id,v,label){return '<input class="in sc" id="'+id+'" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="'+(v==null?"":v)+'" aria-label="'+label+'">'}
 function aResults(){
   var c=C(),gs=c.games.filter(function(g){return g.day===resDay});
@@ -228,10 +269,10 @@ function aInfo(D){
       '<button class="btn icon" data-act="infoUp" data-id="'+s.id+'" aria-label="Nach oben"'+(i?'':' disabled')+'>↑</button><button class="btn icon" data-act="infoDown" data-id="'+s.id+'" aria-label="Nach unten"'+(i<D.info.length-1?'':' disabled')+'>↓</button><button class="btn icon" data-act="infoDel" data-id="'+s.id+'" aria-label="Abschnitt löschen">✕</button></div>'+
       '<textarea class="in ta" data-k="info.text" data-id="'+s.id+'" rows="7" placeholder="Text" aria-label="Text">'+esc(s.text)+'</textarea></div>'}).join("")+
     '</div><button class="btn ghost" data-act="infoAdd">Abschnitt hinzufügen</button>'+
-    '<div class="card" style="margin-top:22px"><h2 class="sec">Shuttle-Abholzeiten (Samstag)</h2><p class="hint">Erscheinen auf der Infoseite im Abschnitt, dessen Überschrift „Shuttle“ enthält. Eine Zeile pro Team, Reihenfolge mit den Pfeilen.</p><div class="rows">'+
+    '<div class="card" style="margin-top:22px"><h2 class="sec">Shuttle-Abholzeiten (Samstag)</h2><p class="hint">Erscheinen auf der Infoseite im Abschnitt, dessen Überschrift „Shuttle“ enthält. Eine Zeile pro Team, Reihenfolge mit den Pfeilen. Mehrere Abfahrten mit „ · “ trennen, dann stehen sie untereinander.</p><button class="btn ghost sm" data-act="shLoad" style="margin-bottom:10px">Shuttle-Plan vom '+SHUTTLE_STAND+' übernehmen (3 Taxis)</button><div class="rows">'+
     D.shuttle.map(function(r,i){return '<div style="border-top:1px solid var(--line);padding-top:8px"><div class="row"><input class="in grow" style="font-weight:700" data-k="sh.team" data-id="'+r.id+'" value="'+esc(r.team)+'" placeholder="Team" aria-label="Team">'+
       '<button class="btn icon" data-act="shUp" data-id="'+r.id+'" aria-label="Nach oben"'+(i?'':' disabled')+'>↑</button><button class="btn icon" data-act="shDown" data-id="'+r.id+'" aria-label="Nach unten"'+(i<D.shuttle.length-1?'':' disabled')+'>↓</button><button class="btn icon" data-act="shDel" data-id="'+r.id+'" aria-label="Zeile löschen">✕</button></div>'+
-      '<div class="row" style="margin-top:6px"><input class="in" style="width:42%" data-k="sh.place" data-id="'+r.id+'" value="'+esc(r.place)+'" placeholder="Abholort" aria-label="Abholort"><input class="in grow" data-k="sh.time" data-id="'+r.id+'" value="'+esc(r.time)+'" placeholder="Abfahrt, z. B. 19:00 (8 Pers.)" aria-label="Abfahrt"></div></div>'}).join("")+
+      '<div class="row" style="margin-top:6px"><input class="in" style="width:42%" data-k="sh.place" data-id="'+r.id+'" value="'+esc(r.place)+'" placeholder="Abholort" aria-label="Abholort"><input class="in grow" data-k="sh.time" data-id="'+r.id+'" value="'+esc(r.time)+'" placeholder="z. B. 19:00 Taxi 1 (8 Pers.) · 19:20 Taxi 2 (2 Pers.)" aria-label="Abfahrt"></div></div>'}).join("")+
     '</div><button class="btn ghost sm" data-act="shAdd" style="margin-top:10px">Zeile hinzufügen</button></div>';
 }
 function aFood(D){
@@ -251,27 +292,50 @@ function aGold(D){
   var last=D.goldLog[D.goldLog.length-1],lastG=last&&D.goldTeams.find(function(g){return g.id===last.g});
   var sum=D.goldLog.reduce(function(s,e){return s+(+e.a||0)},0);
   var log=D.goldLog.slice(-15).reverse().map(function(e){var g=D.goldTeams.find(function(x){return x.id===e.g});
-    return '<div><time>'+new Date(e.ts).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+'</time><span>'+esc(g?gtName(g):"gelöschtes Team")+'</span><b>'+eur(e.a)+'</b><button class="btn icon sm" data-act="delBook" data-id="'+e.id+'" aria-label="Buchung löschen">✕</button></div>'}).join("");
+    return '<div><time>'+new Date(e.ts).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+'</time><span>'+esc(g?gtName(g):"gelöschtes Team")+(e.n?'<small class="lgn"> · '+esc(e.n)+'</small>':'')+'</span><b>'+eur(e.a)+'</b><button class="btn icon sm" data-act="delBook" data-id="'+e.id+'" aria-label="Buchung löschen">✕</button></div>'}).join("");
   return '<div class="card"><h2 class="sec">Verzehrkarte buchen</h2><p class="hint">Team wählen, dann Betrag tippen. Jede Buchung ist sofort live. Im Frontend sieht man nur die Platzierung, keine Beträge.</p>'+
    (D.goldTeams.length?'<div class="gteams">'+D.goldTeams.map(function(g){return '<button class="gbtn" data-act="gsel" data-id="'+g.id+'" aria-pressed="'+(g.id===gsel)+'">'+logo(gtLogoObj(g),30)+'<span>'+esc(gtName(g))+'<small>'+eur(tot[g.id]||0)+'</small></span></button>'}).join("")+'</div>'
      :'<div class="empty">Füge unten zuerst Teams zum Thekengold hinzu.</div>')+
-   '<label class="f" style="margin-top:16px">Betrag</label><div class="amts">'+[10,20,30,50].map(function(a){return '<button class="amt" data-act="book" data-a="'+a+'"'+(gsel?'':' disabled')+'>'+a+' €</button>'}).join("")+'</div>'+
+   '<label class="f" style="margin-top:16px">Getränke</label><div class="amts drinks">'+D.goldQuick.filter(function(q){return (q.label||"").trim()&&q.price>0}).map(function(q){return '<button class="amt dk" data-act="bookQ" data-id="'+q.id+'"'+(gsel?'':' disabled')+'>'+esc(q.label)+'<small>'+eur(q.price)+'</small></button>'}).join("")+'</div>'+
+   '<label class="f" style="margin-top:16px">Verzehrkarte</label><div class="amts">'+[10,20,30,50].map(function(a){return '<button class="amt" data-act="book" data-a="'+a+'"'+(gsel?'':' disabled')+'>'+a+' €</button>'}).join("")+'</div>'+
    '<div class="row" style="margin-top:10px"><input class="in grow" id="custom" inputmode="decimal" placeholder="Eigener Betrag in €" aria-label="Eigener Betrag"><button class="btn red" data-act="bookCustom"'+(gsel?'':' disabled')+'>Buchen</button></div>'+
-   '<button class="btn ghost" data-act="undo" style="width:100%;margin-top:12px"'+(last?'':' disabled')+'>'+(last?'Rückgängig: '+esc(lastG?gtName(lastG):"Team")+', '+eur(last.a):'Nichts rückgängig zu machen')+'</button></div>'+
+   '<button class="btn ghost" data-act="undo" style="width:100%;margin-top:12px"'+(last?'':' disabled')+'>'+(last?'Rückgängig: '+esc(lastG?gtName(lastG):"Team")+(last.n?' ('+esc(last.n)+')':'')+', '+eur(last.a):'Nichts rückgängig zu machen')+'</button></div>'+
    '<div class="card"><h2 class="sec">Letzte Buchungen</h2>'+(log?'<div class="log">'+log+'</div><p class="hint" style="margin:10px 0 0">Gesamt '+eur(sum)+' aus '+D.goldLog.length+' Buchungen.</p>':'<p class="hint" style="margin:0">Noch keine Buchungen.</p>')+'</div>'+
    '<div class="card"><h2 class="sec">Teams im Thekengold</h2><p class="hint">Turnierteams übernehmen Name und Logo automatisch. Zusätzliche Teams kannst du frei anlegen.</p><div class="rows">'+
    D.goldTeams.map(function(g){var t=gtTeam(g);return '<div class="row">'+logo(gtLogoObj(g),34)+(t?'<span class="grow" style="font-weight:650">'+esc(t.name)+'</span>':'<input class="in grow" data-k="gt.name" data-id="'+g.id+'" value="'+esc(g.name)+'" aria-label="Teamname">')+'<button class="btn icon" data-act="delGt" data-id="'+g.id+'" aria-label="Aus Thekengold entfernen">✕</button></div>'}).join("")+
-   '</div><div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn ghost sm" data-act="addGt">Team hinzufügen</button><button class="btn ghost sm" data-act="importGt">Turnierteams übernehmen</button></div></div>';
+   '</div><div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn ghost sm" data-act="addGt">Team hinzufügen</button><button class="btn ghost sm" data-act="importGt">Turnierteams übernehmen</button></div></div>'+
+   '<div class="card"><h2 class="sec">Getränke-Buttons bearbeiten</h2><p class="hint">Name und Preis der Schnellbuttons oben. Reihenfolge mit den Pfeilen, Änderungen mit „Veröffentlichen“ speichern.</p><div class="rows">'+
+   D.goldQuick.map(function(q,i){return '<div style="border-top:1px solid var(--line);padding-top:8px"><div class="row"><input class="in grow" style="font-weight:700" data-k="gq.label" data-id="'+q.id+'" value="'+esc(q.label)+'" placeholder="Getränk" aria-label="Getränk">'+
+     '<input class="in" style="width:84px;text-align:right" inputmode="decimal" data-k="gq.price" data-id="'+q.id+'" value="'+String(q.price).replace(".",",")+'" aria-label="Preis in Euro"><span>€</span></div>'+
+     '<div class="row" style="margin-top:6px;justify-content:flex-end"><button class="btn icon" data-act="gqUp" data-id="'+q.id+'" aria-label="Nach oben"'+(i?'':' disabled')+'>↑</button><button class="btn icon" data-act="gqDown" data-id="'+q.id+'" aria-label="Nach unten"'+(i<D.goldQuick.length-1?'':' disabled')+'>↓</button><button class="btn icon" data-act="gqDel" data-id="'+q.id+'" aria-label="Button löschen">✕</button></div></div>'}).join("")+
+   '</div><button class="btn ghost sm" data-act="gqAdd" style="margin-top:10px">Button hinzufügen</button></div>';
 }
+function aShifts(D){
+  var slots=shiftSlots(shDay),sh=D.shifts,open=0,tot=0;
+  var cards=slots.map(function(h){
+    return '<div class="card"><h2 class="sec" style="margin-bottom:8px">'+hh(h)+' – '+hh(h+1)+' Uhr</h2>'+AREAS.map(function(a){
+      var ak=areaKey(shDay,h,a.id);
+      if(D.shiftsOff[ak])return '<div class="row shoff" style="margin-top:8px"><span class="grow"><b>'+esc(a.name)+'</b> – keine Schicht</span><button class="btn ghost sm" data-act="shOn" data-id="'+ak+'">Wiederherstellen</button></div>';
+      var ins='';for(var i=0;i<a.n;i++){var k=shiftKey(shDay,h,a.id,i),v=sh[k]||"";tot++;if(!v.trim())open++;
+        ins+='<input class="in grow" data-k="shift" data-id="'+k+'" value="'+esc(v)+'" placeholder="Name" aria-label="'+esc(a.name)+' '+hh(h)+' Person '+(i+1)+'">'}
+      return '<div style="margin-top:8px"><div class="row" style="justify-content:space-between;margin-bottom:4px"><label class="f" style="margin:0">'+esc(a.name)+'</label><button class="btn icon sm" data-act="shOff" data-id="'+ak+'" aria-label="Schicht '+esc(a.name)+' '+hh(h)+' entfernen" title="Schicht entfernen">✕</button></div><div class="row">'+ins+'</div></div>'}).join("")+'</div>'}).join("");
+  return '<p class="hint">Schichten je volle Stunde, passend zum Spielplan des Tages. Cafeteria und Grill- und Bierstand mit je zwei Personen, Sprecherkabine mit einer. Ist ein Bereich in einer Stunde nicht geöffnet, die Schicht mit ✕ entfernen. Mit „Veröffentlichen“ speichern. Im Frontend unten auf der Startseite unter „Schichtpläne“, Passwort '+SHIFT_PW+'.</p>'+
+    '<div class="chips" role="group" aria-label="Tag"><button class="chip" data-shday="1" aria-pressed="'+(shDay===1)+'">Samstag</button><button class="chip" data-shday="2" aria-pressed="'+(shDay===2)+'">Sonntag</button></div>'+
+    '<p class="hint"><span class="badge" id="shbadge">'+(tot-open)+' von '+tot+' Plätzen belegt</span></p><div class="rows">'+cards+'</div>'}
 function aGeneral(D){
   var s=D.settings,c=compute(s,D.teams,RESULTS),g=c.games;
   function f(k,lab,type,extra){return '<div><label class="f" for="s-'+k+'">'+lab+'</label><input class="in" id="s-'+k+'" type="'+type+'" data-k="set.'+k+'" value="'+esc(s[k])+'"'+(extra||'')+'></div>'}
-  return '<div class="card"><h2 class="sec">Turniertage und Uhrzeiten</h2><p class="hint">Aus diesen Angaben berechnet die App alle Anstoßzeiten und die Live-Anzeige.</p>'+
+  return '<div class="card"><h2 class="sec">Auflage</h2><p class="hint">Die große Zahl auf der Startseite („Auflage des Turniers“) und im Seitentitel. Für nächstes Jahr einfach hochzählen.</p>'+f("edition","Auflage (Nummer)","number",' min="1" inputmode="numeric"')+'<p class="hint" style="margin:8px 0 0">Vorschau: <b>'+ed()+'. Soester Börde-Cup</b></p></div>'+
+   '<div class="card"><h2 class="sec">Turniertage und Uhrzeiten</h2><p class="hint">Aus diesen Angaben berechnet die App alle Anstoßzeiten und die Live-Anzeige.</p>'+
    '<div class="mgrid" style="grid-template-columns:1fr 1fr">'+f("day1","Samstag (Datum)","date")+f("start1","Beginn Samstag","time")+f("day2","Sonntag (Datum)","date")+f("start2","Beginn Sonntag","time")+'</div></div>'+
    '<div class="card"><h2 class="sec">Spielzeiten</h2><div class="mgrid" style="grid-template-columns:1fr 1fr">'+f("durG","Spielzeit Gruppenspiele","number",' min="1"')+f("chgG","Wechselzeit","number",' min="0"')+f("durK","Spielzeit Platzierungsspiele","number",' min="1"')+f("chgK","Wechselzeit Platzierungsspiele","number",' min="0"')+'</div>'+
    '<p class="hint" style="margin:12px 0 0">Ende Samstag: '+fmtEnd(lastOf(g,1))+' Uhr. Sonntag: Platzierungsspiele ab '+g.filter(function(x){return x.ko})[0].time+' Uhr, Ende '+fmtEnd(lastOf(g,2))+' Uhr.</p></div>'+
    '<div class="card">'+f("refFirst","Schiedsrichter im ersten Spiel des Tages","text")+f("date","Datum als Text auf der Startseite","text",' placeholder="z. B. 24. und 25. Oktober 2026"')+f("place","Ort","text")+'</div>'+
-   '<p class="hint">Veröffentlichte Änderungen erscheinen bei allen Besuchern sofort, ohne Neuladen.</p>';
+   '<p class="hint">Veröffentlichte Änderungen erscheinen bei allen Besuchern sofort, ohne Neuladen.</p>'+
+   '<div class="card dz"><h2 class="sec">Neues Turnierjahr vorbereiten</h2><p class="hint">Setzt Ergebnisse und Thekengold auf null, damit das Turnier für das kommende Jahr bereitsteht. Teams, Logos, Getränkekarte, Infos, Schichtpläne und Einstellungen bleiben erhalten. Das Löschen ist sofort live und lässt sich nicht rückgängig machen – vorher am besten eine Sicherung herunterladen.</p>'+
+   '<div class="rows"><button class="btn ghost" data-act="backup">Sicherung herunterladen (Ergebnisse und Thekengold)</button>'+
+   '<button class="btn red" data-act="resetResults">Alle Ergebnisse löschen ('+Object.keys(RESULTS.games||{}).length+' Spiele)</button>'+
+   '<button class="btn red" data-act="resetGold">Thekengold zurücksetzen ('+(S().goldLog||[]).length+' Buchungen)</button></div></div>';
 }
 function lastOf(gs,d){return gs.filter(function(x){return x.day===d}).slice(-1)[0]}
 function fmtEnd(g){var m=g.start+g.dur;return String(Math.floor(m/60)%24).padStart(2,"0")+":"+String(m%60).padStart(2,"0")}
@@ -283,8 +347,8 @@ function pick(s){var o={};MAIN_FIELDS.forEach(function(k){o[k]=s[k]});return o}
 function isDirty(){return !!DRAFT&&!!STATE&&JSON.stringify(pick(DRAFT))!==JSON.stringify(pick(STATE))}
 function vAdmin(){
   var D=DRAFT,d=isDirty();
-  var body=!isB2()?vMigrate():({results:aResults,teams:aTeams,food:aFood,gold:aGold,info:aInfo,general:aGeneral}[atab]||aResults)(D);
-  var draftTab=["teams","food","info","general"].indexOf(atab)>=0||(atab==="gold");
+  var body=!isB2()?vMigrate():({results:aResults,teams:aTeams,food:aFood,gold:aGold,info:aInfo,shifts:aShifts,general:aGeneral}[atab]||aResults)(D);
+  var draftTab=["teams","food","info","general","shifts"].indexOf(atab)>=0||(atab==="gold");
   return '<div class="ph"><div class="wrap"><img src="'+LOGO+'" alt="Zur Startseite" role="button" tabindex="0" data-go="home"><h1>Orga</h1><button class="btn ghost sm out" data-act="logout">Abmelden</button></div>'+
    '<div class="wrap"><div class="atabs">'+ATABS.map(function(a){return '<button class="chip" data-atab="'+a[0]+'" aria-pressed="'+(a[0]===atab)+'">'+a[1]+'</button>'}).join("")+'</div></div></div>'+
    '<main style="padding-bottom:120px"><div class="wrap">'+body+'</div></main>'+
@@ -293,7 +357,7 @@ function vAdmin(){
 
 /* ---------- render ---------- */
 function render(keep){
-  var y=window.scrollY;
+  var y=window.scrollY;document.title=ed()+". Soester Börde-Cup";
   if(route==="admin"){
     if(fbError){app.innerHTML=vWaiting();return}
     if(!authReady){app.innerHTML='<main><div class="login"><p>Lädt …</p></div></main>';return}
@@ -302,7 +366,7 @@ function render(keep){
     if(!STATE){app.innerHTML=vSetup();return}
     if(!DRAFT)DRAFT=loadDraft();app.innerHTML=vAdmin()}
   else if(!STATE||!isB2()){app.innerHTML=vWaiting()}
-  else{DRAFT=null;app.innerHTML=({home:vHome,plan:vPlan,teams:vTeams,table:vTable,food:vFood,gold:vGold,info:vInfo}[route]||vHome)()}
+  else{DRAFT=null;app.innerHTML=({home:vHome,plan:vPlan,teams:vTeams,table:vTable,food:vFood,gold:vGold,info:vInfo,shifts:vShifts}[route]||vHome)()}
   if(keep)window.scrollTo(0,y);
 }
 function go(r){route=r;saveResume();render(false);window.scrollTo(0,0);if(r==="plan"){var g=document.querySelector(".game.live")||document.querySelector(".game.next");if(g&&g.getBoundingClientRect().top>innerHeight*.6)g.scrollIntoView({block:"center"})}}
@@ -324,6 +388,7 @@ function parseNum(v){v=String(v).trim().replace(",",".");if(v==="")return null;v
 function parseScore(id){var el=document.getElementById(id);if(!el)return undefined;var v=el.value.trim();if(v==="")return null;if(!/^\d{1,2}$/.test(v))return NaN;return parseInt(v,10)}
 
 app.addEventListener("input",function(e){
+  if(e.target.id==="shq"){shQ=e.target.value;document.getElementById("shres").innerHTML=shiftResults(shQ);document.getElementById("shall").style.display=shQ.trim()?"none":"";return}
   var el=e.target,k=el.dataset.k;if(!k||!DRAFT)return;var id=el.dataset.id,v=el.type==="checkbox"?el.checked:el.value;
   if(k==="team.name")DRAFT.teams.find(function(t){return t.id===id}).name=v;
   else if(k.indexOf("it.")===0){var c=findC(el.dataset.cid),it=c.items.find(function(i){return i.id===id}),g=k.slice(3);
@@ -332,8 +397,11 @@ app.addEventListener("input",function(e){
   else if(k==="gt.name")DRAFT.goldTeams.find(function(g){return g.id===id}).name=v;
   else if(k==="info.title")DRAFT.info.find(function(s){return s.id===id}).title=v;
   else if(k==="info.text")DRAFT.info.find(function(s){return s.id===id}).text=v;
+  else if(k==="shift"){if(String(v).trim())DRAFT.shifts[id]=v;else delete DRAFT.shifts[id];var ins=document.querySelectorAll('[data-k="shift"]'),fil=0;ins.forEach(function(x){if(x.value.trim())fil++});var bd=document.getElementById("shbadge");if(bd)bd.textContent=fil+" von "+ins.length+" Plätzen belegt"}
+  else if(k==="gq.label")DRAFT.goldQuick.find(function(q){return q.id===id}).label=v;
+  else if(k==="gq.price"){var gp=parseNum(v);DRAFT.goldQuick.find(function(q){return q.id===id}).price=gp===null?0:gp}
   else if(k.indexOf("sh.")===0)DRAFT.shuttle.find(function(r){return r.id===id})[k.slice(3)]=v;
-  else if(k.indexOf("set.")===0){var f=k.slice(4);DRAFT.settings[f]=["durG","chgG","durK","chgK"].indexOf(f)>=0?Math.max(0,parseInt(v,10)||0):v}
+  else if(k.indexOf("set.")===0){var f=k.slice(4);DRAFT.settings[f]=["durG","chgG","durK","chgK","edition"].indexOf(f)>=0?Math.max(0,parseInt(v,10)||0):v}
   markDirty();
 });
 
@@ -357,6 +425,11 @@ app.addEventListener("change",async function(e){
 
 /* ---------- speichern ---------- */
 function writeErr(err){console.error(err);toast(err&&err.code==="permission-denied"?"Keine Berechtigung. Bitte neu anmelden.":"Speichern fehlgeschlagen. Internetverbindung prüfen.")}
+function askSure(what){var v=prompt(what+"\n\nZum Bestätigen bitte LÖSCHEN eintippen:");return v!==null&&v.trim().toUpperCase()==="LÖSCHEN"}
+function backup(){
+  var data={exportiert:new Date().toISOString(),auflage:ed(),ergebnisse:RESULTS,thekengold:{teams:(STATE&&STATE.goldTeams)||[],buchungen:(STATE&&STATE.goldLog)||[]}};
+  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+  a.download="boerdecup-"+ed()+"-sicherung.json";document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);toast("Sicherung heruntergeladen")}
 async function publish(){
   if(publishing||!DRAFT)return;publishing=true;markDirty();
   var data=clone(pick(DRAFT));data.updated=new Date().toISOString();
@@ -390,22 +463,35 @@ function saveLos(key){
   var los={};los[key]=o;
   setDoc(refs.results,{los:los},{merge:true}).then(function(){toast("Losentscheid gespeichert")}).catch(writeErr);
 }
-function book(a){
+function book(a,n){
   if(!gsel||!(a>0))return;var g=DRAFT.goldTeams.find(function(x){return x.id===gsel});
-  var e={id:uid("b"),g:gsel,a:Math.round(a*100)/100,ts:Date.now()};
+  var e={id:uid("b"),g:gsel,a:Math.round(a*100)/100,ts:Date.now()};if(n)e.n=n;
   updateDoc(refs.gold,{log:arrayUnion(e),updated:new Date().toISOString()}).catch(writeErr);
   var c=document.getElementById("custom");if(c)c.value="";
-  toast("Gebucht: "+gtName(g)+", "+eur(a));
+  toast("Gebucht: "+gtName(g)+(n?", "+n:"")+", "+eur(a));
 }
 
 app.addEventListener("click",function(e){
-  var t=e.target.closest("[data-go],[data-filter],[data-atab],[data-act],[data-team],[data-resday]");if(!t)return;
+  var t=e.target.closest("[data-go],[data-filter],[data-atab],[data-act],[data-team],[data-resday],[data-shday]");if(!t)return;
+  if(t.dataset.shday){shDay=+t.dataset.shday;render(true);return}
   if(t.dataset.go){go(t.dataset.go);return}
   if(t.dataset.team){filter="team:"+t.dataset.team;go("plan");return}
   if(t.dataset.filter){filter=t.dataset.filter;saveResume();render(true);return}
   if(t.dataset.atab){atab=t.dataset.atab;saveResume();render(false);window.scrollTo(0,0);return}
   if(t.dataset.resday){resDay=+t.dataset.resday;saveResume();render(false);return}
   var a=t.dataset.act,id=t.dataset.id;
+  if(a==="shOff"||a==="shOn"){var p=id.split("|"),ar=AREAS.find(function(x){return x.id===p[1]});
+    if(a==="shOff"){var has=false;for(var i=0;i<ar.n;i++){if(DRAFT.shifts[id+"|"+i])has=true}
+      if(has&&!confirm("Schicht "+ar.name+" entfernen? Die eingetragenen Namen werden gelöscht."))return;
+      for(var j=0;j<ar.n;j++)delete DRAFT.shifts[id+"|"+j];DRAFT.shiftsOff[id]=true}
+    else delete DRAFT.shiftsOff[id];
+    markDirty();render(true);return}
+  if(a==="backup"){backup();return}
+  if(a==="resetResults"){if(!askSure("Alle Ergebnisse und Losentscheide löschen? Spielplan, Tabellen und Endstand starten wieder bei null."))return;
+    setDoc(refs.results,{games:{},los:{},updated:new Date().toISOString()}).then(function(){toast("Alle Ergebnisse gelöscht")}).catch(writeErr);return}
+  if(a==="resetGold"){if(!askSure("Alle Thekengold-Buchungen löschen? Die Teams im Thekengold bleiben erhalten."))return;
+    setDoc(refs.gold,{log:[],updated:new Date().toISOString()}).then(function(){toast("Thekengold zurückgesetzt")}).catch(writeErr);return}
+  if(a==="shLock"){lsSet("bc-shifts",null);render(false);return}
   if(a==="logout"){signOut(auth);DRAFT=null;go("home");return}
   if(a==="publish"){publish();return}
   if(a==="reset"){if(confirm("Alle unveröffentlichten Änderungen verwerfen?")){lsSet("bc-draft",null);DRAFT=norm(clone(STATE));render(true)}return}
@@ -417,6 +503,7 @@ app.addEventListener("click",function(e){
   if(a==="gsel"){gsel=gsel===id?"":id;saveResume();render(true);return}
   if(a==="book"){book(+t.dataset.a);return}
   if(a==="bookCustom"){var v=parseNum(document.getElementById("custom").value);if(!(v>0)){toast("Bitte einen Betrag über 0 € eingeben.");return}book(v);return}
+  if(a==="bookQ"){var q=DRAFT.goldQuick.find(function(x){return x.id===id});if(q&&q.price>0)book(q.price,q.label);return}
   if(a==="undo"){var l=STATE.goldLog[STATE.goldLog.length-1];if(!l)return;var lg=STATE.goldTeams.find(function(x){return x.id===l.g});
     updateDoc(refs.gold,{log:arrayRemove(l),updated:new Date().toISOString()}).then(function(){toast("Rückgängig: "+(lg?gtName(lg):"Team")+", "+eur(l.a))}).catch(writeErr);return}
   if(a==="delBook"){if(!confirm("Diese Buchung löschen?"))return;var bk=STATE.goldLog.find(function(x){return x.id===id});if(bk)updateDoc(refs.gold,{log:arrayRemove(bk),updated:new Date().toISOString()}).then(function(){toast("Buchung gelöscht")}).catch(writeErr);return}
@@ -426,6 +513,10 @@ app.addEventListener("click",function(e){
   else if(a==="infoDel"){if(!confirm("Abschnitt „"+(I[ix].title||"")+"“ löschen?"))return;I.splice(ix,1)}
   else if(a==="infoUp"&&ix>0){I.splice(ix-1,0,I.splice(ix,1)[0])}
   else if(a==="infoDown"&&ix>=0&&ix<I.length-1){I.splice(ix+1,0,I.splice(ix,1)[0])}
+  else if(a==="gqAdd"){DRAFT.goldQuick.push({id:uid("q"),label:"",price:0})}
+  else if(a==="gqDel"){DRAFT.goldQuick=DRAFT.goldQuick.filter(function(q){return q.id!==id})}
+  else if(a==="gqUp"||a==="gqDown"){var Q=DRAFT.goldQuick,qi=Q.findIndex(function(q){return q.id===id}),qj=qi+(a==="gqUp"?-1:1);if(qi<0||qj<0||qj>=Q.length)return;Q.splice(qj,0,Q.splice(qi,1)[0])}
+  else if(a==="shLoad"){if(!confirm("Die Abholzeiten durch den Shuttle-Plan vom "+SHUTTLE_STAND+" (3 Taxis) ersetzen? Danach noch „Veröffentlichen“ tippen."))return;DRAFT.shuttle=clone(DEFAULT_SHUTTLE)}
   else if(a==="shAdd"){DRAFT.shuttle.push({id:uid("t"),team:"",place:"Stadthalle",time:""})}
   else if(a==="shDel"){DRAFT.shuttle=DRAFT.shuttle.filter(function(r){return r.id!==id})}
   else if(a==="shUp"||a==="shDown"){var Sh=DRAFT.shuttle,si=Sh.findIndex(function(r){return r.id===id}),sj=si+(a==="shUp"?-1:1);if(si<0||sj<0||sj>=Sh.length)return;Sh.splice(sj,0,Sh.splice(si,1)[0])}
@@ -443,41 +534,16 @@ app.addEventListener("click",function(e){
   else return;
   markDirty();render(true);
 });
+app.addEventListener("submit",function(e){
+  if(e.target.id!=="shf")return;e.preventDefault();
+  var v=document.getElementById("shpw").value.trim();
+  if(v===SHIFT_PW){lsSet("bc-shifts",SHIFT_PW);render(false)}else{document.getElementById("sherr").textContent="Das Passwort stimmt nicht."}
+});
 app.addEventListener("keydown",function(e){
   if((e.key==="Enter"||e.key===" ")&&e.target.matches("img[data-go]")){e.preventDefault();go(e.target.dataset.go)}
   if(e.key==="Escape"&&route==="info")go("home");
   if(e.key==="Enter"&&e.target.classList.contains("sc")){var card=e.target.closest(".rres");if(card){var b=card.querySelector('[data-act="saveRes"]');if(b)b.click()}}
 });
-
-/* ---------- welcome ---------- */
-function welcome(done){
-  // Intro bei jedem Öffnen der Seite (nicht im Orga-Bereich und nicht auf der Infoseite)
-  var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var w=document.createElement("div");w.id="welcome";w.setAttribute("role","dialog");w.setAttribute("aria-label","Willkommen zum 40. Soester Börde-Cup");
-  w.innerHTML='<canvas></canvas><div class="w-inner"><img class="w-logo" src="'+LOGO+'" alt="Logo Soester Hockey-Club"><p class="w-num">40.</p><p class="w-title">Soester Börde-Cup</p><p class="w-sub">Schön, dass ihr da seid</p></div>';
-  document.body.appendChild(w);done();
-  var fin=false;function close(){if(fin)return;fin=true;w.classList.add("out");setTimeout(function(){w.remove()},650)}
-  w.addEventListener("click",close);
-  var cv=w.querySelector("canvas"),ctx=cv.getContext("2d"),dpr=Math.min(2,window.devicePixelRatio||1);
-  var vw=Math.max(innerWidth||0,document.documentElement.clientWidth||0,320),vh=Math.max(innerHeight||0,document.documentElement.clientHeight||0,480);
-  cv.width=vw*dpr;cv.height=vh*dpr;
-  var cols=["#FFFFFF","#000000","#F4D27A","#1C4E9E","#FFFFFF"],P=[];
-  if(reduce){
-    // "Bewegung reduzieren" ist am Gerät aktiv: Konfetti ohne Bewegung, damit es trotzdem festlich aussieht
-    for(var i=0;i<140;i++){ctx.save();ctx.translate(Math.random()*cv.width,Math.random()*cv.height);ctx.rotate(Math.random()*6.3);ctx.fillStyle=cols[i%cols.length];
-      if(Math.random()<.25){ctx.beginPath();ctx.arc(0,0,(3+Math.random()*3)*dpr,0,6.3);ctx.fill()}else ctx.fillRect(-5*dpr,-2.5*dpr,(7+Math.random()*6)*dpr,(3+Math.random()*4)*dpr);ctx.restore()}
-    setTimeout(close,2600);return}
-  function burst(x,y,n,dir){for(var i=0;i<n;i++){var a=dir+(Math.random()-.5)*1.1,s=(9+Math.random()*13)*dpr;
-    P.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,w:(6+Math.random()*7)*dpr,h:(3+Math.random()*5)*dpr,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:cols[i%cols.length],round:Math.random()<.25})}}
-  var t0=performance.now();
-  setTimeout(function(){burst(0,cv.height*.75,90,-Math.PI/3);burst(cv.width,cv.height*.75,90,-Math.PI*2/3)},650);
-  setTimeout(function(){burst(cv.width/2,cv.height*.38,70,-Math.PI/2)},1050);
-  (function tick(now){if(fin&&now-t0>4500)return;ctx.clearRect(0,0,cv.width,cv.height);
-    P.forEach(function(p){p.vy+=.38*dpr;p.vx*=.985;p.vy*=.985;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;
-      if(p.round){ctx.beginPath();ctx.arc(0,0,p.h*.8,0,6.3);ctx.fill()}else{var k=Math.abs(Math.cos(p.r*2));ctx.fillRect(-p.w/2,-p.h/2*k,p.w,p.h*k+1)}ctx.restore()});
-    P=P.filter(function(p){return p.y<cv.height+40});requestAnimationFrame(tick)})(t0);
-  setTimeout(close,3300);
-}
 
 /* ---------- setup & firebase ---------- */
 function vWaiting(){
@@ -487,7 +553,7 @@ function vWaiting(){
   else if(mainLoaded&&STATE&&!isB2())msg='Der Spielplan wird gerade auf den neuen Turniermodus umgestellt. Bitte schau gleich noch einmal vorbei.';
   else if(slowLoad)msg='Die Verbindung zur Datenbank dauert ungewöhnlich lange. Prüfe in Firebase, ob die Firestore-Datenbank angelegt ist und die Werte in config.js stimmen.';
   else{msg='Die Seite wird geladen …';btn=''}
-  return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>40. Soester Börde-Cup</h1><p>'+msg+'</p>'+btn+'</div></main>'}
+  return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>'+ed()+'. Soester Börde-Cup</h1><p>'+msg+'</p>'+btn+'</div></main>'}
 function vSetup(){return '<main><div class="login"><img src="'+LOGO+'" alt=""><h1>Ersteinrichtung</h1><p>Die Datenbank ist noch leer. Lege die Startdaten an: 8 Herren- und 6 Damen-Teams, den Spielplan für beide Tage, eine Beispielkarte und Infotexte.</p><button class="btn red" style="width:100%" data-act="seed">Startdaten anlegen</button><p style="margin-top:14px"><button class="btn ghost sm" data-act="logout">Abmelden</button></p></div></main>'}
 var DEFAULT_MENU=[{"id":"c1","name":"Getränke","items":[{"id":"i1","name":"Bier 0,3 l","price":2.5,"note":"","out":false},{"id":"i2","name":"Radler 0,3 l","price":2.5,"note":"","out":false},{"id":"i3","name":"Softdrinks 0,3 l","price":2,"note":"Cola, Fanta, Sprite","out":false},{"id":"i4","name":"Wasser 0,5 l","price":1.5,"note":"","out":false},{"id":"i5","name":"Kaffee","price":1.5,"note":"","out":false}]},{"id":"c2","name":"Essen","items":[{"id":"i6","name":"Bratwurst im Brötchen","price":3.5,"note":"","out":false},{"id":"i7","name":"Pommes","price":3,"note":"Mayo oder Ketchup","out":false},{"id":"i8","name":"Kuchen","price":2,"note":"selbst gebacken","out":false}]}];
 var CONCEPT_TEXT="Damen (6 Teams)\nJede gegen jede, also 5 Gruppenspiele pro Team (12 Spiele am Samstag, 3 am Sonntagmorgen). Danach Halbfinale (1. gegen 4., 2. gegen 3.), Spiel um Platz 5 (5. gegen 6.), Spiel um Platz 3 und Finale.\n\nHerren (8 Teams)\nZwei Gruppen mit je 4 Teams, jede gegen jede, also 3 Gruppenspiele pro Team, alle am Samstag. Am Sonntag: Halbfinale 1. A gegen 2. B und 1. B gegen 2. A, Überkreuzspiele 3. A gegen 4. B und 3. B gegen 4. A. Danach Spiele um Platz 7, 5 und 3 und das Finale, es werden alle Plätze ausgespielt.\n\nSpielzeiten\nGruppenspiele: 20 Minuten Spielzeit, 5 Minuten Wechsel. Platzierungsspiele am Sonntag: 17 Minuten Spielzeit, 5 Minuten Wechsel. Samstag von 9:00 bis ca. 18:55 Uhr, Sonntag von 9:00 bis ca. 15:00 Uhr.\n\nWertung\nSieg 3 Punkte, Unentschieden 1 Punkt. Bei Punktgleichheit entscheiden Tordifferenz, dann mehr erzielte Tore, zuletzt das Los. Platzierungsspiele werden bei Unentschieden im 7m-Schießen entschieden.\n\nSchiedsrichter\nDas erste Spiel am Samstag und am Sonntag pfeifen zwei Schiedsrichter aus Soest, danach pfeifen immer die beiden Teams aus dem vorherigen Spiel. Bitte bleibt nach eurem Spiel direkt am Platz.";
@@ -499,19 +565,21 @@ var DEFAULT_INFO=[
 var DRAW={H:{A1:"Soester HC",A2:"Steglitzer TK",A3:"Schlick Town and Friends",A4:"THC Münster",B1:"Dortmunder Kronen",B2:"Wilde 13",B3:"HC Kopinnacken",B4:"TG Heimfeld"},
   D:{1:"Soester HC",2:"Wilde 13",3:"Kamucitas",4:"Dortmunder Kronen",5:"HC Buer",6:"HC Drömelig"}};
 // Shuttle Samstag zur Schützenhalle Ampen (2 Großraumtaxis, Stand 13.10.2026)
+// Shuttle Samstag zur Schützenhalle Ampen (3 Taxis, Stand 15.10.2026)
+var SHUTTLE_STAND="15.10.";
 var DEFAULT_SHUTTLE=[
- ["Dortmunder Kronen Herren","Stadthalle","19:00"],
- ["Wilde 13 Herren","Stadthalle","19:00 (8 Pers.) und 19:20 (2 Pers.)"],
- ["Steglitzer TK","Bahnhof","19:20"],
- ["Wilde 13 Damen","Stadthalle","19:20 (6 Pers.) und 19:40 (4 Pers.)"],
- ["THC Münster","Hanse-Hotel","19:35 (8 Pers.) und 19:45 (2 Pers.)"],
- ["HC Drömelig","Stadthalle","19:40 (4 Pers.) und 20:00 (6 Pers.)"],
- ["Kamucitas","Hanse-Hotel","19:45 (6 Pers.) und 19:55 (4 Pers.)"],
- ["Schlick Town and Friends","Stadthalle","20:00 (2 Pers.) und 20:10 (8 Pers.)"],
- ["HC Kopinnacken","Stadthalle","20:20 (8 Pers.) und 20:30 (3 Pers.)"],
- ["TG Heimfeld","Stadthalle","20:30 (5 Pers.) und 20:40 (2 Pers.)"],
- ["Dortmunder Kronen Damen","Stadthalle","20:40 (6 Pers.) und 20:50 (5 Pers.)"],
- ["HC Buer","Stadthalle","20:50 (3 Pers.) und 21:00 (7 Pers.)"],
+ ["Steglitzer TK","City Motel","19:00 Taxi 3 (5 Pers.) · 19:40 Taxi 3 (3 Pers.)"],
+ ["Wilde 13 Herren","Hotel am Wall","19:00 Taxi 1 (8 Pers.) · 19:20 Taxi 1 (2 Pers.)"],
+ ["Dortmunder Kronen Herren","Hotel am Wall","19:00 Taxi 2 (8 Pers.)"],
+ ["THC Münster","Hanse-Hotel","19:15 Taxi 3 (5 Pers.) · 19:25 Taxi 3 (5 Pers.)"],
+ ["Wilde 13 Damen","Hotel am Wall","19:20 Taxi 1 (6 Pers.) · 19:20 Taxi 2 (4 Pers.)"],
+ ["HC Drömelig","Hotel am Wall","19:20 Taxi 2 (4 Pers.) · 19:40 Taxi 1 (6 Pers.)"],
+ ["Schlick Town and Friends","Hotel am Wall","19:40 Taxi 1 (2 Pers.) · 19:40 Taxi 2 (8 Pers.)"],
+ ["TG Heimfeld","City Motel","19:40 Taxi 3 (2 Pers.) · 20:00 Taxi 3 (5 Pers.)"],
+ ["HC Kopinnacken","Hotel am Wall","20:00 Taxi 1 (8 Pers.) · 20:00 Taxi 2 (3 Pers.)"],
+ ["HC Buer","Hotel am Wall","20:00 Taxi 2 (5 Pers.) · 20:20 Taxi 1 (5 Pers.)"],
+ ["Kamucitas","Hanse-Hotel","20:25 Taxi 3 (5 Pers.) · 20:35 Taxi 3 (5 Pers.)"],
+ ["Dortmunder Kronen Damen","Hotel am Wall","20:40 Taxi 1 (8 Pers.) · 20:40 Taxi 2 (3 Pers.)"],
  ["Soester HC Herren und Damen","–","eigene Anreise"]].map(function(r,i){return {id:"t"+(i+1),team:r[0],place:r[1],time:r[2]}});
 function nkey(n){return String(n||"").toLowerCase().replace(/[^a-z0-9äöüß]/g,"")}
 function newMain(old){
@@ -522,7 +590,7 @@ function newMain(old){
   var ci=info.findIndex(function(x){return /turnierkonzept/i.test(x.title||"")});if(ci>=0)info[ci].text=CONCEPT_TEXT;else info.unshift({id:"s1",title:"Turnierkonzept",text:CONCEPT_TEXT});
   return {mode:MODE,settings:s,teams:teams,menu:(old&&old.menu&&old.menu.length)?old.menu:DEFAULT_MENU,
     goldTeams:teams.map(function(t){return {id:"g"+t.id,teamId:t.id,name:""}}).concat(keepGold),
-    info:info,shuttle:clone(DEFAULT_SHUTTLE),updated:new Date().toISOString()};
+    info:info,shuttle:clone(DEFAULT_SHUTTLE),shuttleStand:SHUTTLE_STAND,updated:new Date().toISOString()};
 }
 async function seed(){
   if(STATE||!mainLoaded)return;
@@ -611,13 +679,14 @@ function restFallback(c){
   setTimeout(function(){if(!liveOK){load();restTimer=setInterval(load,15000)}},5000);
 }
 /* ---------- start ---------- */
-setInterval(function(){if((route==="plan"||route==="home")&&!document.querySelector("#welcome"))render(true)},20000);
+setInterval(function(){if(route==="plan"||route==="home")render(true)},20000);
 window.addEventListener("pagehide",saveResume);window.addEventListener("beforeunload",saveResume);
 var res=lsGet("bc-resume");
 if(res&&Date.now()-res.t<90e3){route=res.route||"home";atab=res.atab||atab;gsel=res.gsel||"";filter=res.filter||"Alle";if(typeof res.resDay==="number")resDay=res.resDay}
 if(ATABS.every(function(x){return x[0]!==atab}))atab="results";
 if(location.hash==="#orga")route="admin";
 if(location.hash==="#info")route="info";
-if(route==="admin"||route==="info"){done0()}else welcome(done0);
+if(location.hash==="#schichten")route="shifts";
+done0();
 function done0(){render(false)}
 startFirebase();
